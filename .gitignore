@@ -1,0 +1,13 @@
+**/__pycache__
+*.pyc
+*.log
+
+**/.ipynb_checkpoints
+**/.idea
+**/.vscode
+# **/slurm_*
+
+MUJOCO_LOG.TXT
+
+## Ignoring Sphinx doc files
+doc/_build
