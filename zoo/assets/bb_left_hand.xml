@@ -1,0 +1,312 @@
+<mujoco model="bb_left_hand">
+    <include file="common/materials.xml"/>
+
+    <!-- A VERY IMPORTANT DISCOVERY:
+         JUST BY LOAING THE TEXTURES AND MATERIALS IN THE XML MODEL WE WILL CONSUME
+         A LOT OF GPU MEMORY, EVEN IF WE DO NOT USE THEM IN ANY OBJECT!
+         
+           * CONSIDER USING COLORS INSTEAD OF MATERIALS!
+           * OR CONDITIONALIZE USING/LOADING TEXTURES/MATERIALS ON A VARIABLE!
+     -->
+    
+    <compiler angle="radian" meshdir="mesh/bb_left_hand/" texturedir="texture/"/>
+    <!-- "option" tag is taken from MPL.xml hand -->
+    <option timestep="0.002" iterations="50" apirate="50" solver="Newton" tolerance="1e-10" cone="elliptic" gravity="0 0 -9.81" />
+    <!-- <option integrator="RK4" timestep="0.01"/> -->
+    
+    <!-- MPL ALTERNATIVE -->
+    <!-- <size njmax="600" nconmax="150" nstack="300000"/> -->
+    <size njmax="500" nconmax="100" />
+
+    <default>
+        <default class="Generic"> 
+            <geom contype="1" conaffinity="1" condim="4" margin="0.001" material="self" /> <!-- material="MatMesh" -->
+        	<joint limited="true" damping="0.2" armature=".01"/>
+        	<site type="ellipsoid" group="3"/> <!-- material="MatTouch" -->
+            <position ctrllimited="true" kp="10"/>
+		</default>
+    </default>
+
+    <statistic extent="1" center="0 -0.2 0.2"/>
+    <visual>
+        <quality shadowsize="2048"/>
+    	<map fogstart="6" fogend="10"/>
+    	<headlight diffuse=".6 .6 .6" specular="0 0 0"/>
+    </visual>
+
+    <!-- TCJ: Thumb ... Joint
+    TPJ: Thumb Proximal Joint
+    TDJ: Thumb Distal Joint
+
+    IPJ: Index Proximal Joint
+    IDJ: Index Distal Joint
+
+    MPJ: Middle Proximal Joint
+    MDJ: Middle Distal Joint
+
+    RPJ: Ring Proximal Joint
+    RDJ: Ring Distal Joint
+
+    PPJ: Pinky Proximal Joint
+    PDJ: Pinky Distal Joint -->
+
+    <asset>
+        <mesh name="base_link" file="base_link.STL" />
+        <mesh name="PPL" file="PPL.STL" />
+        <mesh name="PDL" file="PDL.STL" />
+        <mesh name="RPL" file="RPL.STL" />
+        <mesh name="RDL" file="RDL.STL" />
+        <mesh name="MPL" file="MPL.STL" />
+        <mesh name="MDL" file="MDL.STL" />
+        <mesh name="IPL" file="IPL.STL" />
+        <mesh name="IDL" file="IDL.STL" />
+        <mesh name="TCL" file="TCL.STL" />
+        <mesh name="TPL" file="TPL.STL" />
+        <mesh name="TDL" file="TDL.STL" />
+
+
+        <!-- wood2d takes more GPU memory than marble2d -->
+        <texture name="marble2d" type="2d" file="marble.png"/>
+        <!-- <texture name="wood2d" type="2d" file="wood.png"/> -->
+        <material name="table2d" texture="marble2d" reflectance="0.3" rgba=".8 .8 .8 1"/>
+
+        <texture name="groundplane" type="2d" builtin="checker" rgb1=".2 .3 .4" rgb2=".1 .2 .3" width="100" height="100"/>
+        <material name="groundplane" texture="groundplane" texrepeat="10 10"/>
+
+
+        <!-- <texture name="skin" type="cube" file="skin.png"/>
+        <texture name="wood2d" type="2d" file="wood.png"/>
+        <texture name="woodcube" type="cube" file="wood.png"/>
+        <texture name="marble2d" type="2d" file="marble.png"/>
+        <texture name="marblecube" type="cube" file="marble.png"/>
+        <texture name="groundplane" type="2d" builtin="checker" rgb1=".2 .3 .4" rgb2=".1 .2 .3" 
+            width="100" height="100"/>
+        
+
+        <material name="table2d" texture="wood2d" reflectance="0.3" rgba=".8 .8 .8 1"/>
+        <material name="tablecube" texture="woodcube" rgba=".8 .8 .8 1"/>
+        <material name="groundplane" texture="groundplane" texrepeat="10 10"/>
+
+        <material name="MatMesh" texture="skin"/>
+
+        
+		<texture file="square.png"/>
+		<texture name="foil" file="silverRaw.png"/>
+        <texture file="woodb.png"/>
+        <material name="MatFoil" texture="foil" specular="1" shininess=".3"  rgba=".9 .9 .9 1"/> -->
+		<!-- <material name="MatPlane" specular=".3" shininess=".3" rgba=".3 .3 .2 1"/> -->
+        <!-- <material name="MatWood" texture="wood" specular="0.4" shininess=".1" texrepeat="3 3"/> -->
+        <!-- <material name="MatSquare" texture="square" specular="1" shininess=".6"  rgba=".8 .8 .8 1"/>
+        <material name="MatWoodR" texture="wood2d" specular="1" shininess=".3"  rgba="1 0.5 0.5 1"/>
+        <material name="MatWoodG" texture="wood2d" specular="1" shininess=".3"  rgba="0.2 1 0.2 1"/>
+        <material name="MatWoodB" texture="woodb" specular="1" shininess=".3"/> -->
+    </asset>
+
+    <!-- <contact>       
+        <exclude body1="wristz" body2="wristy"/>
+		<exclude body1="wristx" body2="thumb0"/>
+		<exclude body1="palm" body2="thumb1"/>
+        <exclude body1="palm" body2="index1"/>
+        <exclude body1="palm" body2="middle1"/>
+        <exclude body1="palm" body2="ring1"/>
+        <exclude body1="palm" body2="pinky1"/>
+    </contact> -->
+
+    <worldbody>
+        <light directional="false" cutoff="35" exponent="10" diffuse=".7 .7 .7" pos="0.4 -0.2 1.5" dir="-0.4 0.2 -1.5" specular=".3 .3 .3"/>
+        <camera name="fixed" pos="0 -0.7 0.7" zaxis="0 -1 1" fovy="45" ipd="0.068"/>
+        
+        <!-- table -->
+        <geom type="plane" pos="0 0 0" size=".5 .5 .025" material="table2d"/> <!-- material="table2d" -->
+        <geom contype="0" conaffinity="0" type="box" pos="0 0 -0.026" size=".5 .5 .025"/> <!-- material="tablecube" -->
+		<geom contype="0" conaffinity="0" type="cylinder" fromto=".4 .4 -1.001 .4 .4 -0.001" size="0.04"/>
+		<geom contype="0" conaffinity="0" type="cylinder" fromto="-.4 .4 -1.001 -.4 .4 -0.001" size="0.04"/>
+		<geom contype="0" conaffinity="0" type="cylinder" fromto=".4 -.4 -1.001 .4 -.4 -0.001" size="0.04"/>
+		<geom contype="0" conaffinity="0" type="cylinder" fromto="-.4 -.4 -1.001 -.4 -.4 -0.001" size="0.04"/>
+        <geom contype="0" conaffinity="0" type="plane" pos="0 0 -1" size="10 10 0.25" material="groundplane"/> <!-- material="groundplane" -->
+        <!-- /table -->
+
+        <!-- object -->
+        <body name="long_cylinder" pos=".06 0.1 0.125" quat="1 0 0 0">
+            <joint type="free" damping="0" armature="0" limited="false"/>
+            <!-- <geom type="box" size="0.025 0.025 0.025" material="MatSquare"/>  -->
+            <geom type="cylinder" pos="0 0 0" size="0.025 0.125" material="target" />  <!-- material="MatWoodB" -->
+            
+            <!-- <inertial pos="0 0 0" quat="1 0 0 0" mass="0.49087385212340523" diaginertia="0.00263333 0.00263333 0.0001534"/> -->
+        </body>
+        <!-- /object -->
+
+        <!-- <body name="mocap" mocap="true" pos="0 -0.35 0.2" quat="0 0 0 1" axisangle="0 0 1 3.141592"> -->
+        <body name="mocap" mocap="true" pos="0 -0.35 0.2" quat="0 0 0 1">
+            <geom type="box" group="1" size="0.015 0.015 0.015" contype="0" conaffinity="0" rgba=".9 .5 .5 1"/>
+        </body>
+
+        <!-- ROBOT -->
+        <!-- <body childclass="Generic" name="base_link" pos="0 -0.335 0.2" quat="0 0 3.1415 0.1"> -->
+        <body childclass="Generic" name="base_link" pos="0 -0.335 0.2" quat="2.36 0 3.1415 0">
+            <joint type="free" damping="0" armature="0" limited="false"/>
+
+            <inertial pos="-0.00393916 0.0601545 -0.000633525" mass="0.218885" diaginertia="1e-05 1e-05 1e-05" />
+            <geom type="mesh" rgba="0.752941 0.752941 0.752941 1" mesh="base_link" />
+            <body name="PPL" pos="0.0291239 0.109021 -0.00240167" quat="0.583861 0.517036 0.414965 0.468598">
+                <inertial pos="0.0185447 0.00122979 -6.11859e-08" mass="0.00428965" diaginertia="1e-06 1e-06 1e-06" />
+                <joint name="PPJ" type="hinge" pos="0 0 0" axis="0 0 1" range="0 1.57" />
+                <geom type="mesh" rgba="0.792157 0.819608 0.933333 1" mesh="PPL" />
+                <body name="PDL" pos="0.035659 0.00216546 0">
+                    <inertial pos="0.0132061 0.00518222 -1.07692e-07" mass="0.0052304" diaginertia="1e-06 1e-06 1e-06" />
+                    <joint name="PDJ" type="hinge" pos="0 0 0" axis="0 0 1" range="0 1.57"/>
+                    <geom type="mesh" rgba="0.792157 0.819608 0.933333 1" mesh="PDL" />
+                </body>
+            </body>
+            <body name="RPL" pos="0.00741287 0.116336 -0.00572859" quat="0.53625 0.526971 0.462142 0.470279">
+                <inertial pos="0.0210198 0.00180111 1.57902e-07" mass="0.00578842" diaginertia="1e-06 1e-06 1e-06" />
+                <joint name="RPJ" type="hinge" pos="0 0 0" axis="0 0 1" range="0 1.57"/>
+                <geom type="mesh" rgba="0.792157 0.819608 0.933333 1" mesh="RPL" />
+                <body name="RDL" pos="0.0396486 0.00256075 0">
+                    <inertial pos="0.0157663 0.00906834 6.42579e-08" mass="0.00647903" diaginertia="1e-06 1e-06 1e-06" />
+                    <joint name="RDJ" type="hinge" pos="0 0 0" axis="0 0 1" range="0 1.57"/>
+                    <geom type="mesh" rgba="0.792157 0.819608 0.933333 1" mesh="RDL" />
+                </body>
+            </body>
+            <body name="MPL" pos="-0.0141884 0.118928 -0.00672859" quat="0.503678 0.526149 0.494951 0.473813">
+                <inertial pos="0.022788 0.00305908 9.12356e-08" mass="0.00688777" diaginertia="1e-06 1e-06 1e-06" />
+                <joint name="MPJ" type="hinge" pos="0 0 0" axis="0 0 1" range="0 1.57"/>
+                <geom type="mesh" rgba="0.792157 0.819608 0.933333 1" mesh="MPL" />
+                <body name="MDL" pos="0.0434209 0.0049315 0">
+                    <inertial pos="0.0201145 0.0106882 -3.66487e-07" mass="0.00808465" diaginertia="1e-06 1e-06 1e-06" />
+                    <joint name="MDJ" type="hinge" pos="0 0 0" axis="0 0 1" range="0 1.57"/>
+                    <geom type="mesh" rgba="0.792157 0.819608 0.933333 1" mesh="MDL" />
+                </body>
+            </body>
+            <body name="IPL" pos="-0.0371047 0.116971 0.00222195" quat="0.454519 0.541675 0.541675 0.454519">
+                <inertial pos="0.0185648 0.00201975 3.85313e-08" mass="0.00447489" diaginertia="1e-06 1e-06 1e-06" />
+                <joint name="IPJ" type="hinge" pos="0 0 0" axis="0 0 1" range="0 1.57"/>
+                <geom type="mesh" rgba="0.792157 0.819608 0.933333 1" mesh="IPL" />
+                <body name="IDL" pos="0.0357158 0.00343272 0">
+                    <inertial pos="0.0200632 0.0107841 -3.64005e-07" mass="0.00808464" diaginertia="1e-06 1e-06 1e-06" />
+                    <joint name="IDJ" type="hinge" pos="0 0 0" axis="0 0 1" range="0 1.57"/>
+                    <geom type="mesh" rgba="0.792157 0.819608 0.933333 1" mesh="IDL" />
+                </body>
+            </body>
+            <body name="TCL" pos="-0.0150289 0.0361693 0.0176392" quat="0 0 0.707107 0.707107">
+                <inertial pos="0.0057504 0.00856342 -0.00035167" mass="0.00765789" diaginertia="1e-06 1e-06 1e-06" />
+                <joint name="TCJ" type="hinge" pos="0 0 0" axis="0 0 1" range="0 1.05"/>
+                <geom type="mesh" rgba="0.792157 0.819608 0.933333 1" mesh="TCL" />
+                <body name="TPL" pos="0.0114902 0.0147368 0.00150953" quat="0.688035 -0.688035 -0.163121 0.163121">
+                    <inertial pos="0.0347204 -0.0254991 -3.88841e-05" mass="0.0238266" diaginertia="1e-06 1e-06 1e-06" />
+                    <joint name="TPJ" type="hinge" pos="0 0 0" axis="0 0 1" range="-.57 0" />
+                    <geom type="mesh" rgba="0.792157 0.819608 0.933333 1" mesh="TPL" />
+                    <body name="TDL" pos="0.0642101 -0.047131 0.000500011">
+                        <inertial pos="0.00184464 -0.0158263 2.37766e-07" mass="0.00526886" diaginertia="1e-06 1e-06 1e-06" />
+                        <joint name="TDJ" type="hinge" pos="0 0 0" axis="0 0 1" range="-1.14 0"/>
+                        <geom type="mesh" rgba="0.792157 0.819608 0.933333 1" mesh="TDL" />
+                    </body>
+                </body>
+            </body>
+        </body>
+    </worldbody>
+
+
+    <sensor>
+        <jointpos name="SJP_thumb_C"	        joint="TCJ"/>
+        <jointpos name="SJP_thumb_proximal"	    joint="TPJ"/>
+        <jointpos name="SJP_thumb_distal"	    joint="TDJ"/>
+        <jointpos name="SJP_index_proximal"	    joint="IPJ"/>
+        <jointpos name="SJP_index_distal"	    joint="IDJ"/>
+        <jointpos name="SJP_middle_proximal"	joint="MPJ"/>
+        <jointpos name="SJP_middle_distal"	    joint="MDJ"/>
+        <jointpos name="SJP_ring_proximal"	    joint="RPJ"/>
+        <jointpos name="SJP_ring_distal"	    joint="RDJ"/>
+        <jointpos name="SJP_pinky_proximal"	    joint="PPJ"/>
+        <jointpos name="SJP_pinky_distal"	    joint="PDJ"/>
+
+        <jointvel name="SJV_thumb_C"	        joint="TCJ"/>
+        <jointvel name="SJV_thumb_proximal"	    joint="TPJ"/>
+        <jointvel name="SJV_thumb_distal"	    joint="TDJ"/>
+        <jointvel name="SJV_index_proximal"	    joint="IPJ"/>
+        <jointvel name="SJV_index_distal"	    joint="IDJ"/>
+        <jointvel name="SJV_middle_proximal"	joint="MPJ"/>
+        <jointvel name="SJV_middle_distal"	    joint="MDJ"/>
+        <jointvel name="SJV_ring_proximal"	    joint="RPJ"/>
+        <jointvel name="SJV_ring_distal"	    joint="RDJ"/>
+        <jointvel name="SJV_pinky_proximal"	    joint="PPJ"/>
+        <jointvel name="SJV_pinky_distal"	    joint="PDJ"/>
+
+		<actuatorpos name="SAP_thumb_C" 	     actuator="A_thumb_C" />
+        <actuatorpos name="SAP_thumb_proximal" 	 actuator="A_thumb_proximal" />
+        <actuatorpos name="SAP_index_proximal" 	 actuator="A_index_proximal" />
+        <actuatorpos name="SAP_middle_proximal"  actuator="A_middle_proximal" />
+        <actuatorpos name="SAP_ring_proximal" 	 actuator="A_ring_proximal" />
+        <actuatorpos name="SAP_pinky_proximal" 	 actuator="A_pinky_proximal" />
+
+        <actuatorvel name="SAV_thumb_C" 	     actuator="A_thumb_C" />
+        <actuatorvel name="SAV_thumb_proximal" 	 actuator="A_thumb_proximal" />
+        <actuatorvel name="SAV_index_proximal" 	 actuator="A_index_proximal" />
+        <actuatorvel name="SAV_middle_proximal"  actuator="A_middle_proximal" />
+        <actuatorvel name="SAV_ring_proximal" 	 actuator="A_ring_proximal" />
+        <actuatorvel name="SAV_pinky_proximal" 	 actuator="A_pinky_proximal" />
+
+        <actuatorfrc name="SAF_thumb_C" 	     actuator="A_thumb_C" />
+        <actuatorfrc name="SAF_thumb_proximal" 	 actuator="A_thumb_proximal" />
+        <actuatorfrc name="SAF_index_proximal" 	 actuator="A_index_proximal" />
+        <actuatorfrc name="SAF_middle_proximal"  actuator="A_middle_proximal" />
+        <actuatorfrc name="SAF_ring_proximal" 	 actuator="A_ring_proximal" />
+        <actuatorfrc name="SAF_pinky_proximal" 	 actuator="A_pinky_proximal" />
+
+    	<!--
+        <accelerometer name="S_thumb_IMU" 	site="thumb_IMU"/>
+        <gyro                               site="thumb_IMU"/>
+        <touch name="S_thumb_proximal" 	site="thumb_proximal"/>
+        -->
+	</sensor>
+
+
+
+
+
+    <tendon>
+        <!-- <fixed name="T_index12_cpl" range="0 1">
+			<joint joint="IDJ"  coef="0.00705"/>
+			<joint joint="IPJ"  coef="-0.00805"/>
+		</fixed> -->
+        <!-- <fixed name="T_index21_cpl" range="0 1">
+			<joint joint="index_PIP"  coef="0.010"/>
+			<joint joint="index_MCP"  coef="-0.010"/>
+		</fixed> -->
+	</tendon>
+	
+	
+	<equality>
+        <weld body1="mocap" body2="base_link" solref="0.01 1" solimp=".9 .9 0.01"/>
+        <!-- <connect body1="mocap" body2="base_link" anchor="0 0 0" solref="0.02 1" solimp="0.9 0.95 0.001" /> -->
+
+		<!-- Proximal-Distal Couplings -->
+		<!-- <tendon name="E_index21_cpl" 	tendon1="T_index12_cpl"/> -->
+		
+		<!-- AD-AB Coupling -->
+		<joint name="thumb_cpl"  joint1="TPJ" joint2="TDJ" polycoef="0 0.9 0 0 0"/>
+        <joint name="index_cpl"  joint1="IPJ" joint2="IDJ" polycoef="0 1    0 0 0"/>
+        <joint name="middle_cpl" joint1="MPJ" joint2="MDJ" polycoef="0 1    0 0 0"/>
+        <joint name="ring_cpl"   joint1="RPJ" joint2="RDJ" polycoef="0 1    0 0 0"/>
+        <joint name="pinky_cpl"  joint1="PPJ" joint2="PDJ" polycoef="0 1    0 0 0"/>
+	</equality>
+	
+
+	<!-- <actuator>
+        <position name="A_thumb_C"         class="Generic" joint="TCJ"  ctrlrange="0 1.05"/>
+        <position name="A_thumb_proximal"  class="Generic" joint="TPJ"  ctrlrange="-.57 0"/>
+		<position name="A_index_proximal"  class="Generic" joint="IPJ"  ctrlrange="0 1.57"/>
+		<position name="A_middle_proximal" class="Generic" joint="MPJ"  ctrlrange="0 1.57"/>
+		<position name="A_ring_proximal"   class="Generic" joint="RPJ"  ctrlrange="0 1.57"/>
+        <position name="A_pinky_proximal"  class="Generic" joint="PPJ"  ctrlrange="0 1.57"/>
+	</actuator> -->
+
+    <actuator>
+        <position name="A_thumb_C"         class="Generic" joint="TCJ"  ctrlrange="0 1.05"/>
+        <position name="A_thumb_proximal"  class="Generic" joint="TPJ"  ctrlrange="-.57 0"/>
+		<position name="A_index_proximal"  class="Generic" joint="IPJ"  ctrlrange="0 1.57"/>
+		<position name="A_middle_proximal" class="Generic" joint="MPJ"  ctrlrange="0 1.57"/>
+		<position name="A_ring_proximal"   class="Generic" joint="RPJ"  ctrlrange="0 1.57"/>
+        <position name="A_pinky_proximal"  class="Generic" joint="PPJ"  ctrlrange="0 1.57"/>
+	</actuator>
+</mujoco>
