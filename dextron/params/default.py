@@ -1,8 +1,17 @@
+"""
+Todo:
+    Compute the exploration/exploitation factor
+
+See Also:
+    :ref:`ref-parameter-files`
+"""
+
 import numpy as np
 from copy import deepcopy
+from collections import OrderedDict
 
 from digideep.environment import MakeEnvironment
-from collections import OrderedDict
+from digideep.utility.toolbox import get_module
 
 ################################################################################
 #########                       CONTROL PANEL                          #########
@@ -17,30 +26,35 @@ from collections import OrderedDict
 #  - We may unify the name of parameters which are basically the same in different
 #    methods, but have different names.
 
-
 cpanel = OrderedDict()
 
-# cpanel["model_name"] = 'HalfCheetah-v2'
-# cpanel["model_name"] = 'PongNoFrameskip-v4' # Atari Env
-# cpanel["model_name"] = 'Pendulum-v0'        # Classic Control Env
-cpanel["model_name"] = 'Ant-v2'             # MuJoCo Env
+cpanel["model_name"] = 'DMCHandGrasp-v0'
+cpanel["env_module"] = 'dextron.zoo'
 
-# cpanel["model_name"] = 'DMCHandGrasp-v0'    # dm_control wrapped environment
-# cpanel["model_name"] = 'DMBenchHumanoidStand-v0'    # dm_control wrapped environment
-# cpanel["model_name"] = 'DMBenchCheetahRun-v0'    # dm_control wrapped environment
+# digideep.environment.dmc2gym
+# roboschool
+# pybullet_envs
+
+
+
 
 # General Parameters
 # num_frames = 10e6  # Number of frames to train
-cpanel["epoch_size"]    = 20 # cycles
+cpanel["epoch_size"]    = 2 # cycles
 cpanel["number_epochs"] = 100000
-cpanel["seed"] = 13
+cpanel["test_activate"] = False  # Test Activate
+cpanel["test_interval"] = 10    # Test Interval
+cpanel["save_interval"] = 1     # Save Interval
+
+cpanel["seed"] = 0
 cpanel["cuda_deterministic"] = False # With TRUE we MIGHT get more deterministic results but at the cost of speed.
-cpanel["memory_size_in_chunks"] = 1 # MUST be 1 for PPO/A2C/ACKTR. POSSIBLE: 2^0 (~1) | 2^3 (~10) | 2^7 (~100) | 2^10 (~1000) | 2^13 (~10000)
+cpanel["memory_size_in_chunks"] = 1 # MUST be 1 for PPO/A2C/ACKTR. SUGGESTIONS: 2^0 (~1) | 2^3 (~10) | 2^7 (~100) | 2^10 (~1000) | 2^13 (~10000)
 
 cpanel["gamma"] = 0.99     # The gamma parameter used in VecNormalize | Agent.preprocess | Agent.step
 cpanel["use_gae"] = True   # Whether to use GAE to calculate returns or not.
 cpanel["tau"] = 0.95       # The parameter used for calculating advantage function.
-cpanel["recurrent"] = True
+cpanel["recurrent"] = False
+cpanel["actor_feature_size"] = 64
 
 # Wrappers
 cpanel["add_monitor"]           = True  # Always useful, sometimes necessary.
@@ -48,63 +62,41 @@ cpanel["add_time_step"]         = False # It is suggested for MuJoCo environment
 cpanel["add_image_transpose"]   = False # Necessary if training on Gym with renders, e.g. Atari games
 cpanel["add_dummy_multi_agent"] = False # Necessary if the environment is not multi-agent (i.e. all dmc and gym environments),
                                         # to make it compatibl with our multi-agent architecture.
-cpanel["add_vec_normalize"]     = True  # Should be used with MuJoCo environments. CANNOT be used with rendered observations.
+cpanel["add_vec_normalize"]     = True  # NOTE: USE WITH CARE. Might be used with MuJoCo environments. CANNOT be used with rendered observations.
 cpanel["add_frame_stack_axis"]  = False # Necessary for training on renders, e.g. Atari games. The nstack parameter is usually 4
                                         # This stacks frames at a custom axis. If the ImageTranspose is activated
                                         # then axis should be set to 0 for compatibility with PyTorch.
 # Wrapper Parameters
 cpanel["nstack"] = 4
 
-# NOTE: On the DIGIHAND computer we used num_workers=32 & n_update=20
-
 # EXPLORATION: num_workers * n_steps
-cpanel["num_workers"] = 8         # Number of exploratory workers working together
-cpanel["n_steps"] = 64 # 2048    # Number of frames to produce
+cpanel["num_workers"] = 4         # Number of exploratory workers working together
+cpanel["n_steps"] = 512           # Number of frames to produce
 # EXPLOITATION: [PPO_EPOCH] Number of times to perform PPO update, i.e. number of frames to process.
-cpanel["n_update"] = 8
+cpanel["n_update"] = 10
 # batch_size = n_steps * num_workers = 32 * 4. Choose the num_mini_batches accordingly.
-cpanel["num_mini_batches"] = cpanel["num_workers"]
+cpanel["num_mini_batches"] = 2
 
 # Method Parameters
 cpanel["lr"] = 3e-4 # 2.5e-4 | 7e-4
 cpanel["eps"] = 1e-5 # Epsilon parameter used in the optimizer(s) (ADAM/RMSProp/...)
 
-cpanel["clip_param"] = 0.1 # 0.2   # PPO clip parameter
-cpanel["value_loss_coef"] = 0.50 # 1 # 0.50  # Value loss coefficient
-cpanel["entropy_coef"] = 0 # 0.01  # Entropy term coefficient
-cpanel["max_grad_norm"] = 0.50  # Max norm of gradients
+cpanel["clip_param"] = 0.1       # 0.2  # PPO clip parameter
+cpanel["value_loss_coef"] = 0.50 # 1    # Value loss coefficient
+cpanel["entropy_coef"] = 0       # 0.01 # Entropy term coefficient
+cpanel["max_grad_norm"] = 0.50   # Max norm of gradients
 cpanel["use_clipped_value_loss"] = True
-
-
-# params["trainer"]["methodargs"]["log_interval"] = 100 # Log results every n times
-
-
-
-
-
-
 
 
 ################################################################################
 #########                      PARAMETER TREE                          #########
 ################################################################################
-"""
-class ParamEngine(object):
-    def __init__(self, cpanel):
-        self.cpanel = cpanel
-        self.params = self.set_params(self.cpanel)
-    
-    def __repr__(self):
-        res = yaml.dump(params, indent=2))
-        return res
-        # "Hyper-Parameters:\n\n%s"%
-"""
-
 def gen_params(cpanel):
     params = {}
     # Environment
     params["env"] = {}
-    params["env"]["name"] = cpanel["model_name"]
+    params["env"]["name"]   = cpanel["model_name"]
+    params["env"]["module"] = cpanel["env_module"]
 
     params["env"]["wrappers"] = {"add_monitor": cpanel["add_monitor"], 
                                 "add_time_step": cpanel["add_time_step"],
@@ -143,15 +135,16 @@ def gen_params(cpanel):
 
 
 
-    ###############################################
-    # Runner: [episode < rollout < cycle < epoch] #
-    ###############################################
+    #####################################
+    # Runner: [episode < cycle < epoch] #
+    #####################################
     params["runner"] = {}
     params["runner"]["n_cycles"] = cpanel["epoch_size"]    # Meaning that 100 cycles are 1 epoch.
     params["runner"]["n_epochs"] = cpanel["number_epochs"] # Testing and savings are done after each epoch.
     params["runner"]["randargs"] = {'seed':cpanel["seed"], 'cuda_deterministic':cpanel["cuda_deterministic"]}
-    # params["runner"]["test_int"] = 10 # Test_interval
-    # params["runner"]["save_int"] = 10 # Test_interval
+    params["runner"]["test_act"] = cpanel["test_activate"] # Test Activate
+    params["runner"]["test_int"] = cpanel["test_interval"] # Test Interval
+    params["runner"]["save_int"] = cpanel["save_interval"] # Save Interval
 
     # We "save" after each epoch is done.
     # We "test" after each epoch is done.
@@ -164,7 +157,7 @@ def gen_params(cpanel):
     ##################
     params["agents"]["agent"] = {}
     params["agents"]["agent"]["name"] = "agent"
-    params["agents"]["agent"]["type"] = "digideep.agent.ppo.Trainer"
+    params["agents"]["agent"]["type"] = "digideep.agent.PPO"
     params["agents"]["agent"]["methodargs"] = {}
     params["agents"]["agent"]["methodargs"]["n_steps"] = cpanel["n_steps"]  # Same as "num_steps" / T
     params["agents"]["agent"]["methodargs"]["n_update"] = cpanel["n_update"]  # Number of times to perform PPO update. Alternative name: PPO_EPOCH
@@ -187,44 +180,21 @@ def gen_params(cpanel):
     #############
     ### Model ###
     #############
-    # TODO: HERE IS THE EXCEPTION. THERE SHOULD BE NO EXCEPTIONS:
-    # NOTE: Whenever action_space is of spaces.Dict type, send the "agent" part to the model,
-    #       otherwise send it as a whole.
-    # if "agent" in params["env"]["config"]["action_space"]:
-    #     action_space = params["env"]["config"]["action_space"]["agent"]
-    # else:
-    #     action_space = params["env"]["config"]["action_space"]
-    
     agent_name = params["agents"]["agent"]["name"]
-    action_space = params["env"]["config"]["action_space"][agent_name]
-    params["agents"]["agent"]["modelname"] = "actor_critic/MLP"
-    params["agents"]["agent"]["modelargs"] = {"observation_space": params["env"]["config"]["observation_space"],
-                                              "action_space": action_space,
-                                              "base_kwargs": {"recurrent":cpanel["recurrent"], "hidden_size":512}}
-    params["agents"]["agent"]["optimname"] = "Adam"
+    params["agents"]["agent"]["policyname"] = "digideep.policy.stochastic.Policy"
+    params["agents"]["agent"]["policyargs"] = {"obs_space": params["env"]["config"]["observation_space"],
+                                               "act_space": params["env"]["config"]["action_space"][agent_name],
+                                               "modelname": "digideep.model.models.MLPModel",
+                                               "modelargs": {"recurrent":cpanel["recurrent"], "output_size":cpanel["actor_feature_size"]}
+                                               }
+    params["agents"]["agent"]["optimname"] = "torch.optim.Adam"
     params["agents"]["agent"]["optimargs"] = {"lr":cpanel["lr"], "eps":cpanel["eps"]}
 
     # RMSprop optimizer apha
     # params["agents"]["agent"]["optimargs"] = {"lr":1e-2, "alpha":0.99, "eps":1e-5, "weight_decay":0, "momentum":0, "centered":False}
-    ## Averaging
-    # params["agents"]["agent"]["averaging"] = {"mode":"soft", "polyak_factor":0.05}
-
-    # params["agents"]["agent"]["clamp_return"] = 1/(1-float(cpanel["gamma"]))
-    # params["agents"]["agent"]["clamp_obs"] = 200
     ##############################################
 
 
-    # ##############################################
-    # ### Agent (#2) ###
-    # ##################
-    # params["agents"]["mocap"] = {}
-    # params["agents"]["mocap"]["name"] = "mocap"
-    # params["agents"]["mocap"]["type"] = "digideep.agent.human_arm.Trainer"
-
-
-    ##############################################
-
-    
     ##############################################
     ### Memory ###
     ##############
@@ -245,32 +215,39 @@ def gen_params(cpanel):
     params["explorer"]["train"] = {}
     params["explorer"]["train"]["mode"] = "train"
     params["explorer"]["train"]["env"] = params["env"]
+    params["explorer"]["train"]["do_reset"] = False
+    params["explorer"]["train"]["final_action"] = True
     params["explorer"]["train"]["num_workers"] = cpanel["num_workers"]
     params["explorer"]["train"]["deterministic"] = False # MUST: Takes random actions
     params["explorer"]["train"]["n_steps"] = cpanel["n_steps"] # Number of steps to take a step in the environment
     params["explorer"]["train"]["render"] = False
+    params["explorer"]["train"]["render_delay"] = 0
     params["explorer"]["train"]["seed"] = cpanel["seed"] # + 3500
 
     params["explorer"]["test"] = {}
     params["explorer"]["test"]["mode"] = "test"
     params["explorer"]["test"]["env"] = params["env"]
-    params["explorer"]["test"]["num_workers"] = cpanel["num_workers"] # We can use the same amount of workers for testing!
+    params["explorer"]["test"]["do_reset"] = False
+    params["explorer"]["test"]["final_action"] = False
+    params["explorer"]["test"]["num_workers"] = 1 # cpanel["num_workers"] # We can use the same amount of workers for testing!
     params["explorer"]["test"]["deterministic"] = True   # MUST: Takes the best action
-    params["explorer"]["test"]["n_steps"] = cpanel["n_steps"] # Number of steps to take a step in the environment
+    params["explorer"]["test"]["n_steps"] = params["env"]["config"]["max_episode_steps"] # Number of steps to take a step in the environment
     params["explorer"]["test"]["render"] = False
+    params["explorer"]["test"]["render_delay"] = 0
     params["explorer"]["test"]["seed"] = cpanel["seed"] + 100 # We want to make the seed of test environments different from training.
 
     params["explorer"]["eval"] = {}
     params["explorer"]["eval"]["mode"] = "eval"
     params["explorer"]["eval"]["env"] = params["env"]
+    params["explorer"]["eval"]["do_reset"] = False
+    params["explorer"]["eval"]["final_action"] = False
     params["explorer"]["eval"]["num_workers"] = 1
     params["explorer"]["eval"]["deterministic"] = True   # MUST: Takes the best action
-    params["explorer"]["eval"]["n_steps"] = cpanel["n_steps"] # Number of steps to take a step in the environment
+    params["explorer"]["eval"]["n_steps"] = params["env"]["config"]["max_episode_steps"] # Number of steps to take a step in the environment
     params["explorer"]["eval"]["render"] = True
+    params["explorer"]["eval"]["render_delay"] = 0
     params["explorer"]["eval"]["seed"] = cpanel["seed"] + 101 # We want to make the seed of eval environment different from test/train.
     ##############################################
 
     return params
 
-# TODO: We may use deepcopy
-# TODO: Compute the exploration/exploitation factor

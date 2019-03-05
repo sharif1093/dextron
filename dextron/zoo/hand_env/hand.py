@@ -19,7 +19,7 @@ import numpy as np
 # SUITE = containers.TaggedTasks()
 # @SUITE.add('benchmarking')
 
-from digideep.zoo.common import get_model_and_assets_by_name
+from dextron.zoo.common import get_model_and_assets_by_name
 
 
 
