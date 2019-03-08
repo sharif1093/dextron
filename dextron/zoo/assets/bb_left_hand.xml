@@ -306,7 +306,8 @@
 
     <actuator>
         <position name="A_thumb_C"         class="Generic" joint="TCJ"  ctrlrange="0 1.05"/>
-        <position name="A_thumb_proximal"  class="Generic" joint="TPJ"  ctrlrange="-.57 0"/>
+        <!-- <position name="A_thumb_proximal"  class="Generic" joint="TPJ"  ctrlrange="-.57 0"/> -->
+        <position name="A_thumb_proximal"  class="Generic" joint="TPJ"  ctrlrange="0 .57" gear="-1 0 0 0 0 0"/>
 		<position name="A_index_proximal"  class="Generic" joint="IPJ"  ctrlrange="0 1.57"/>
 		<position name="A_middle_proximal" class="Generic" joint="MPJ"  ctrlrange="0 1.57"/>
 		<position name="A_ring_proximal"   class="Generic" joint="RPJ"  ctrlrange="0 1.57"/>
