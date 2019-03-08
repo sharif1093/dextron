@@ -143,7 +143,7 @@
 
         <!-- ROBOT -->
         <!-- <body childclass="Generic" name="base_link" pos="0 -0.335 0.2" quat="0 0 3.1415 0.1"> -->
-        <body childclass="Generic" name="base_link" pos="0 -0.335 0.2" quat="2.36 0 3.1415 0">
+        <body childclass="Generic" name="base_link" pos="0 -0.335 0.2" quat="3.1415 0 3.1415 0" > <!-- quat="2.36 0 3.1415 0" -->
             <joint type="free" damping="0" armature="0" limited="false"/>
 
             <inertial pos="-0.00393916 0.0601545 -0.000633525" mass="0.218885" diaginertia="1e-05 1e-05 1e-05" />
