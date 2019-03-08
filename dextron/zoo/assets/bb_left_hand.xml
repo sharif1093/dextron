@@ -130,7 +130,10 @@
         <body name="long_cylinder" pos=".06 0.1 0.125" quat="1 0 0 0">
             <joint type="free" damping="0" armature="0" limited="false"/>
             <!-- <geom type="box" size="0.025 0.025 0.025" material="MatSquare"/>  -->
-            <geom type="cylinder" pos="0 0 0" size="0.025 0.125" material="target" />  <!-- material="MatWoodB" -->
+            
+            <!-- <geom type="cylinder" pos="0 0 0" size="0.025 0.125" material="target" /> -->
+            <!-- material="MatWoodB" -->
+            <geom type="cylinder" pos="0 0 0" size="0.020 0.125" material="target" />
             
             <!-- <inertial pos="0 0 0" quat="1 0 0 0" mass="0.49087385212340523" diaginertia="0.00263333 0.00263333 0.0001534"/> -->
         </body>
