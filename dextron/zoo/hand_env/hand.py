@@ -90,15 +90,15 @@ def gen_traj_min_jerk(point_start, point_end, T, dt):
 class Hand(base.Task):
     """A Hand's `Task` to train "tasks"."""
 
-    def __init__(self, random=None):
+    def __init__(self, **params):
         """Initialize an instance of `Hand`.
 
             random: Optional, either a `numpy.random.RandomState` instance, an
                 integer seed for creating a new `RandomState`, or None to select a seed
                 automatically (default).
         """
-        # self._hopping = hopping
-        super(Hand, self).__init__(random=random)
+        self.params = params
+        super(Hand, self).__init__(random=self.params.get("random", None))
 
     def initialize_episode(self, physics):
         """Sets the state of the environment at the start of each episode.
@@ -140,7 +140,7 @@ class Hand(base.Task):
             points.append(start_point)
             points.append(np.array([0.01,  0.04,  0.3], dtype=np.float32))
 
-            times = [_DEFAULT_TIME_LIMIT/3]
+            times = [self.params["environment_kwargs"]["time_limit"]/3]
 
         else:
             # a0 = np.random.rand() * 0.01
@@ -159,14 +159,15 @@ class Hand(base.Task):
             points.append(np.array([0.01,  0.04,  0.2], dtype=np.float32))
             points.append(np.array([0.01,  0.04,  0.3], dtype=np.float32))
             
-            times = [_DEFAULT_TIME_LIMIT/2, _DEFAULT_TIME_LIMIT/3]
+            times = [self.params["environment_kwargs"]["time_limit"]/2, self.params["environment_kwargs"]["time_limit"]/3]
 
         physics.named.data.mocap_pos["mocap"] = start_point
         physics.named.data.xpos["base_link"] = start_point + offset
 
         self.mocap_traj = []
         for i in range(len(points)-1):
-            self.mocap_traj.append(gen_traj_min_jerk(points[i], points[i+1], times[i], _CONTROL_TIMESTEP))
+            self.mocap_traj.append(gen_traj_min_jerk(points[i], points[i+1], times[i],
+                                   self.params["environment_kwargs"]["control_timestep"]))
         self.mocap_traj_index = 0
 
         # TODO: If you want to solve the issue of jumps in the hand position when setting the mocap position,
