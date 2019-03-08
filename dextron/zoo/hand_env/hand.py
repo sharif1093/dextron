@@ -250,7 +250,14 @@ class Hand(base.Task):
         # obs['mocap_quat'] = physics.data.mocap_quat[:].copy()
 
         obs['xpos_object'] = physics.named.data.xpos['long_cylinder'].copy()
-        ##### obs['xquat_object'] = physics.named.data.xquat['long_cylinder'].copy()
+        # obs['xquat_object'] = physics.named.data.xquat['long_cylinder'].copy()
+
+        # print("shape of pos:", obs['position'].shape)
+
+        obs['rel_obj_hand'] = obs['mocap_pos'] - obs['xpos_object']
+
+        # print("type = ", physics.named.data.xpos['long_cylinder'])
+        # exit()
 
         # if (obs['xpos'][0] != 0) and (obs['xpos'][1] != 0) and (obs['xpos'][2] != 0):
         #     print('xpos =', obs['xpos'])
