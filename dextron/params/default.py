@@ -28,14 +28,13 @@ from digideep.utility.toolbox import get_module
 
 cpanel = OrderedDict()
 
-cpanel["model_name"] = 'DMCHandGrasp-v0'
-cpanel["env_module"] = 'dextron.zoo'
+# cpanel["model_name"] = 'DMCHandGrasp-v0'
+# cpanel["from_module"] = 'dextron.zoo'
 
-# digideep.environment.dmc2gym
-# roboschool
-# pybullet_envs
-
-
+cpanel["model_name"] = 'CustomDMCHandGrasp-v0'
+cpanel["from_params"] = True
+# Environment parameters
+cpanel["time_limit"] = 6
 
 
 # General Parameters
@@ -95,8 +94,27 @@ def gen_params(cpanel):
     params = {}
     # Environment
     params["env"] = {}
-    params["env"]["name"]   = cpanel["model_name"]
-    params["env"]["module"] = cpanel["env_module"]
+    params["env"]["name"] = cpanel["model_name"]
+    
+    params["env"]["from_module"] = cpanel.get("from_module", '')
+    params["env"]["from_params"] = cpanel.get("from_params", False)
+    
+    if params["env"]["from_params"]:
+        # For having environment from parameters
+        from digideep.environment.dmc2gym.registration import EnvCreator
+        from dextron.zoo.hand_env.hand import grasp
+
+        task_kwargs = {"random":None}
+        environment_kwargs = {"time_limit":cpanel["time_limit"], "control_timestep":0.02}
+        params["env"]["register_args"] = {"id":cpanel["model_name"],
+                                          "entry_point":"digideep.environment.dmc2gym.wrapper:DmControlWrapper",
+                                          "kwargs":{'dmcenv_creator':EnvCreator(grasp,
+                                                                                task_kwargs=task_kwargs,
+                                                                                environment_kwargs=environment_kwargs,
+                                                                                visualize_reward=True),
+                                                    'flat_observation':True}
+                                         }
+    ##########
 
     params["env"]["wrappers"] = {"add_monitor": cpanel["add_monitor"], 
                                 "add_time_step": cpanel["add_time_step"],
