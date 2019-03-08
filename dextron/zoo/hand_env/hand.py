@@ -272,6 +272,10 @@ class Hand(base.Task):
         height = physics.named.data.xipos['long_cylinder', 'z']
         reward = 10 * (height-0.125)
         ##### print("reward = ", reward)
+
+        # If the action is causing early termination, it should be penalized for that!
+        # if self.get_termination(physics) == 0.0:
+        #     reward = -10
     
         # from pprint import pprint
         # print(">>>>", physics.named.model.qpos0['long_cylinder']) 
