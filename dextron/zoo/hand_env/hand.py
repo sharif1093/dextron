@@ -14,47 +14,35 @@ from dm_control.utils import rewards
 from dm_control.rl import specs
 import numpy as np
 
-## Registering the model in as dm_control SUITE benchmark.
-# from dm_control.utils import containers
-# SUITE = containers.TaggedTasks()
-# @SUITE.add('benchmarking')
-
 from dextron.zoo.common import get_model_and_assets_by_name
 
-
-
+import sys
 
 #####################
 ## MODEL CONSTANTS ##
 #####################
 _MODEL_NAME = "bb_left_hand"
-_CONTROL_TIMESTEP = .02  # (Seconds)
-
-# Default duration of an episode, in seconds.
-_DEFAULT_TIME_LIMIT = 3
-
-# # Minimal height of torso over foot above which stand reward is 1.
-# _STAND_HEIGHT = 0.6
-
-# # Hopping speed above which hop reward is 1.
-# _HOP_SPEED = 2
+_NUM_ACTION = 2
 
 # We want to delay actual running of this function until the last moment.
+# Moreover, we can use this "get_model_and_assets" in different tasks if
+# we have more than one.
 get_model_and_assets = lambda: get_model_and_assets_by_name(_MODEL_NAME)
 
 
-def grasp(time_limit=_DEFAULT_TIME_LIMIT, random=None, environment_kwargs=None):
+def grasp(**params): # environment_kwargs=None, 
     """Returns a Hand that strives."""
     physics = Physics.from_xml_string(*get_model_and_assets())
-    task = Hand(random=random)
-    environment_kwargs = environment_kwargs or {}
-    return control.Environment(
-        physics, task, time_limit=time_limit, control_timestep=_CONTROL_TIMESTEP,
-        **environment_kwargs)
+    task = Hand(**params)
+    environment_kwargs = params.get("environment_kwargs", {})
+    return control.Environment(physics, task, **environment_kwargs)
 
-
+######################################################################################
+#### Extended Physics ####
+##########################
+# Add functions that can help your observation.
 class Physics(mujoco.Physics):
-    """Physics simulation with additional features for the Hopper domain."""
+    """Physics simulation with additional features for the Hand domain."""
     pass
     # def object_height(self):
 
@@ -74,7 +62,9 @@ class Physics(mujoco.Physics):
 #         return np.log1p(self.named.data.sensordata[['touch_toe', 'touch_heel']])
 
 
-
+######################################################################################
+#### Trajectory Generator ####
+##############################
 def gen_traj_min_jerk(point_start, point_end, T, dt):
     t = 0
     R = 0.01*T
