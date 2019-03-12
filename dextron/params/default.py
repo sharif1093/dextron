@@ -53,7 +53,7 @@ cpanel["gamma"] = 0.99     # The gamma parameter used in VecNormalize | Agent.pr
 cpanel["use_gae"] = True   # Whether to use GAE to calculate returns or not.
 cpanel["tau"] = 0.95       # The parameter used for calculating advantage function.
 cpanel["recurrent"] = False
-cpanel["actor_feature_size"] = 64
+cpanel["actor_feature_size"] = 16
 
 # Wrappers
 cpanel["add_monitor"]           = True  # Always useful, sometimes necessary.
@@ -69,12 +69,12 @@ cpanel["add_frame_stack_axis"]  = False # Necessary for training on renders, e.g
 cpanel["nstack"] = 4
 
 # EXPLORATION: num_workers * n_steps
-cpanel["num_workers"] = 4         # Number of exploratory workers working together
-cpanel["n_steps"] = 512           # Number of frames to produce
+cpanel["num_workers"] = 1         # Number of exploratory workers working together
+cpanel["n_steps"] = 256           # Number of frames to produce
 # EXPLOITATION: [PPO_EPOCH] Number of times to perform PPO update, i.e. number of frames to process.
-cpanel["n_update"] = 10
+cpanel["n_update"] = 4
 # batch_size = n_steps * num_workers = 32 * 4. Choose the num_mini_batches accordingly.
-cpanel["num_mini_batches"] = 2
+cpanel["num_mini_batches"] = 8
 
 # Method Parameters
 cpanel["lr"] = 3e-4 # 2.5e-4 | 7e-4
@@ -82,7 +82,7 @@ cpanel["eps"] = 1e-5 # Epsilon parameter used in the optimizer(s) (ADAM/RMSProp/
 
 cpanel["clip_param"] = 0.1       # 0.2  # PPO clip parameter
 cpanel["value_loss_coef"] = 0.50 # 1    # Value loss coefficient
-cpanel["entropy_coef"] = 0       # 0.01 # Entropy term coefficient
+cpanel["entropy_coef"] = 0.00    # 0.01 # Entropy term coefficient
 cpanel["max_grad_norm"] = 0.50   # Max norm of gradients
 cpanel["use_clipped_value_loss"] = True
 
