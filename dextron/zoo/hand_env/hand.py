@@ -16,6 +16,8 @@ import numpy as np
 
 from dextron.zoo.common import get_model_and_assets_by_name
 
+from .grasp_controller_all_param import GraspController
+
 import sys
 
 #####################
@@ -85,8 +87,13 @@ def gen_traj_min_jerk(point_start, point_end, T, dt):
         t = t+dt
         #       pos   vel    acc
         yield q[:,0],q[:,1],q[:,2]
+######################################################################################
 
 
+
+######################################################################################
+#### Task ####
+##############
 class Hand(base.Task):
     """A Hand's `Task` to train "tasks"."""
 
@@ -100,6 +107,7 @@ class Hand(base.Task):
         self.params = params
         super(Hand, self).__init__(random=self.params.get("random", None))
 
+
     def initialize_episode(self, physics):
         """Sets the state of the environment at the start of each episode.
         Do the following steps:
@@ -108,6 +116,15 @@ class Hand(base.Task):
         3. Assign the mocap pos: physics.named.data.mocap_pos["mocap"]
         4. Assign the mocap quat: physics.named.data.mocap_quat["mocap"]
         """
+        ###### print("\nEpisode restarted...")
+        # from pprint import pprint
+        # pprint(physics.named.data.ctrl)
+        # pprint(physics.named.model.actuator_ctrlrange)
+        # exit()
+
+        self.grasper = GraspController(physics)
+        
+        
         
         # print("--- Inertia of long_cylinder:", physics.named.model.body_inertia["long_cylinder"])
         # print("--- Mass of long_cylinder:", physics.named.model.body_mass["long_cylinder"])
@@ -133,12 +150,13 @@ class Hand(base.Task):
         a1 = np.random.rand()
         # For 10% of all times, start from a grasped position.
         offset = np.array([0,0.015,0], dtype=np.float32)
-        if a1 > 0.8:
-            start_point = np.array([0.01, 0.04, 0.2], dtype=np.float32)
+        if a1 > 1: # 0.8
+            # This part is not executed at all for now.
+            start_point = np.array([0.02, 0.00, 0.1], dtype=np.float32)
 
             points = []
             points.append(start_point)
-            points.append(np.array([0.01,  0.04,  0.3], dtype=np.float32))
+            points.append(np.array([0.02,  0.00,  0.3], dtype=np.float32))
 
             times = [self.params["environment_kwargs"]["time_limit"]/3]
 
@@ -151,13 +169,15 @@ class Hand(base.Task):
             # start_point = np.array([a0, -0.35, 0.2], dtype=np.float32)
 
             ## Randomizing initial position x&y on a quadcircle:
-            theta = np.random.rand() * np.pi / 2
-            start_point = np.array([-0.35*np.sin(theta), -0.35*np.cos(theta), 0.2], dtype=np.float32)
+            
+            # theta = np.random.rand() * np.pi / 6
+            theta = np.pi / 7
+            start_point = np.array([-0.35*np.sin(theta), -0.35*np.cos(theta), 0.1], dtype=np.float32)
 
             points = []
             points.append(start_point)
-            points.append(np.array([0.01,  0.04,  0.2], dtype=np.float32))
-            points.append(np.array([0.01,  0.04,  0.3], dtype=np.float32))
+            points.append(np.array([0.02,  0.00,  0.1], dtype=np.float32))
+            points.append(np.array([0.02,  0.00,  0.3], dtype=np.float32))
             
             times = [self.params["environment_kwargs"]["time_limit"]/2, self.params["environment_kwargs"]["time_limit"]/3]
 
@@ -179,7 +199,14 @@ class Hand(base.Task):
         """Returns a `BoundedArraySpec` matching the `physics` actuators."""
         spec = collections.OrderedDict()
         # Setting actuator types, which is a BoundedArraySpec:
-        spec["agent"] = mujoco.action_spec(physics)
+
+        ## Position [continuous] control on individual actuators:
+        # spec["agent"] = mujoco.action_spec(physics)
+        ## Velocity [discrete] control for all fingers simultaneously:
+        # spec["agent"] = specs.BoundedArraySpec(shape=(1,), dtype=np.int, minimum=0, maximum=_NUM_ACTION)
+        ## Position control for all fingers simultaneously:
+        spec["agent"] = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=0, maximum=1) # 1: Fully closed || 0: Fully open
+
         
         # physics.model.nmocap
         # NOTE: In the current implementation we are not using "mocap" as an external action.
@@ -206,9 +233,11 @@ class Hand(base.Task):
         ## Interpret the action
         # Setting the actuators to move. It calls physics.set_control
         # on the actuators to set their values:
-        super(Hand, self).before_step(action["agent"], physics)
-        # Setting the mocap bodies to move:
         
+        ctrl_actions = self.grasper(action["agent"], physics)
+        super(Hand, self).before_step(ctrl_actions, physics)
+        # Setting the mocap bodies to move:
+
         try:
             mocap_pos, mocap_vel, mocap_acc = next(self.mocap_traj[self.mocap_traj_index])
             physics.named.data.mocap_pos["mocap"] = mocap_pos
@@ -231,8 +260,8 @@ class Hand(base.Task):
         obs = collections.OrderedDict()
         # # Ignores horizontal position to maintain translational invariance:
         # obs['position'] = physics.data.qpos[1:].copy()
-        obs['position'] = physics.data.qpos[:].copy()
-        obs['velocity'] = physics.data.qvel[:].copy()
+        ## obs['position'] = physics.data.qpos[:].copy()
+        ## obs['velocity'] = physics.data.qvel[:].copy()
         # obs['position'] = physics.position()
         # obs['velocity'] = physics.velocity()
 
@@ -242,19 +271,24 @@ class Hand(base.Task):
         # from pprint import pprint
         # pprint(dir(physics.data))
         # exit()
-        obs['mocap_pos'] = physics.data.mocap_pos[:].copy()
+        ## obs['mocap_pos'] = physics.data.mocap_pos[:].copy()
         ##### obs['mocap_quat'] = physics.data.mocap_quat[:].copy()
 
         ## What about the object??
         # obs['mocap_pos'] = physics.data.mocap_pos[:].copy()
         # obs['mocap_quat'] = physics.data.mocap_quat[:].copy()
 
-        obs['xpos_object'] = physics.named.data.xpos['long_cylinder'].copy()
+        ## obs['xpos_object'] = physics.named.data.xpos['long_cylinder'].copy()
         # obs['xquat_object'] = physics.named.data.xquat['long_cylinder'].copy()
 
         # print("shape of pos:", obs['position'].shape)
 
-        obs['rel_obj_hand'] = obs['mocap_pos'] - obs['xpos_object']
+        # obs['rel_obj_hand'] = obs['mocap_pos'] - obs['xpos_object']
+
+        ## obs['rel_obj_hand'] = physics.data.mocap_pos[:].copy() - physics.named.data.xpos['long_cylinder'].copy()
+
+        # print("time =", physics.timestep())
+        obs['time'] = np.array(physics.time())
 
         # print("type = ", physics.named.data.xpos['long_cylinder'])
         # exit()
@@ -270,12 +304,15 @@ class Hand(base.Task):
     def get_reward(self, physics):
         """Returns a reward applicable to the performed task."""
         height = physics.named.data.xipos['long_cylinder', 'z']
-        reward = 10 * (height-0.125)
+        # reward = 10 * (height-0.125)
+        reward = 5 * (height - 0.325)
+
+
         ##### print("reward = ", reward)
 
         # If the action is causing early termination, it should be penalized for that!
-        # if self.get_termination(physics) == 0.0:
-        #     reward = -10
+        if self.get_termination(physics) == 0.0:
+            reward = -(6-physics.time())*5
     
         # from pprint import pprint
         # print(">>>>", physics.named.model.qpos0['long_cylinder']) 
