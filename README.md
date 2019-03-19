@@ -25,6 +25,7 @@ python -m digideep.environment.play --module "dextron.zoo" --model "DMCHandGrasp
 * `entropy_coef`: The more this coefficient, the more the exploration is encouraged. It should be balanced with the rest of the losses. If it is too high,
   random actions are encouraged and the policy won't learn. If it is too low, only little explorarion is encouraged and possibly we'll get stuck in a local
   minimum. *Look at the loss values to find a good coefficient.*
+    * See "https://github.com/dennybritz/reinforcement-learning/issues/34".
 
 > Entropy loss is a clever and simple mechanism to encourage the agent to explore by providing a loss parameter that teaches the network to avoid very 
 > confident predictions. As the distribution of the predictions becomes more spread out, the network will sample those moves more often and learn that 
