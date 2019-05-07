@@ -24,6 +24,7 @@
         	<joint limited="true" damping="0.2" armature=".01"/>
         	<site type="ellipsoid" group="3"/> <!-- material="MatTouch" -->
             <position ctrllimited="true" kp="10"/>
+            <velocity ctrllimited="true" kv="50"/>
 		</default>
     </default>
 
@@ -287,7 +288,7 @@
 		<!-- <tendon name="E_index21_cpl" 	tendon1="T_index12_cpl"/> -->
 		
 		<!-- AD-AB Coupling -->
-		<joint name="thumb_cpl"  joint1="TPJ" joint2="TDJ" polycoef="0 0.9 0 0 0"/>
+		<joint name="thumb_cpl"  joint1="TPJ" joint2="TDJ" polycoef="0 0.9  0 0 0"/>
         <joint name="index_cpl"  joint1="IPJ" joint2="IDJ" polycoef="0 1    0 0 0"/>
         <joint name="middle_cpl" joint1="MPJ" joint2="MDJ" polycoef="0 1    0 0 0"/>
         <joint name="ring_cpl"   joint1="RPJ" joint2="RDJ" polycoef="0 1    0 0 0"/>
@@ -304,13 +305,35 @@
         <position name="A_pinky_proximal"  class="Generic" joint="PPJ"  ctrlrange="0 1.57"/>
 	</actuator> -->
 
-    <actuator>
+    <!-- Thumb actuator now with gear -->
+    <!-- <position name="A_thumb_proximal"  class="Generic" joint="TPJ"  ctrlrange="-.57 0"/> -->
+    <!-- <actuator>
         <position name="A_thumb_C"         class="Generic" joint="TCJ"  ctrlrange="0 1.05"/>
-        <!-- <position name="A_thumb_proximal"  class="Generic" joint="TPJ"  ctrlrange="-.57 0"/> -->
         <position name="A_thumb_proximal"  class="Generic" joint="TPJ"  ctrlrange="0 .57" gear="-1 0 0 0 0 0"/>
 		<position name="A_index_proximal"  class="Generic" joint="IPJ"  ctrlrange="0 1.57"/>
 		<position name="A_middle_proximal" class="Generic" joint="MPJ"  ctrlrange="0 1.57"/>
 		<position name="A_ring_proximal"   class="Generic" joint="RPJ"  ctrlrange="0 1.57"/>
         <position name="A_pinky_proximal"  class="Generic" joint="PPJ"  ctrlrange="0 1.57"/>
+	</actuator> -->
+
+    
+    <!-- Are the joints initialized randomly? -->
+    <!-- Reference: http://www.mujoco.org/book/XMLreference.html#velocity -->
+    <actuator>
+        <position name="A_thumb_C"         class="Generic" joint="TCJ"  ctrlrange="0 1.05"/>
+        <velocity name="A_thumb_proximal"  class="Generic" joint="TPJ"  ctrlrange="-0.5 0.5" forcerange="-1 1" forcelimited="true" gear="-1 0 0 0 0 0"/>
+		<velocity name="A_index_proximal"  class="Generic" joint="IPJ"  ctrlrange="-0.5 0.5" forcerange="-1 1" forcelimited="true" />
+		<velocity name="A_middle_proximal" class="Generic" joint="MPJ"  ctrlrange="-0.5 0.5" forcerange="-1 1" forcelimited="true" />
+		<velocity name="A_ring_proximal"   class="Generic" joint="RPJ"  ctrlrange="-0.5 0.5" forcerange="-1 1" forcelimited="true" />
+        <velocity name="A_pinky_proximal"  class="Generic" joint="PPJ"  ctrlrange="-0.5 0.5" forcerange="-1 1" forcelimited="true" />
 	</actuator>
+
+    <!-- <actuator>
+        <position name="A_thumb_C"         class="Generic" joint="TCJ"  ctrlrange="0 1.05"/>
+        <velocity name="A_thumb_proximal"  class="Generic" joint="TPJ"  ctrlrange="0 0.01" forcerange="-1 1" forcelimited="true" gear="-1 0 0 0 0 0"/>
+		<velocity name="A_index_proximal"  class="Generic" joint="IPJ"  ctrlrange="0 0.01" forcerange="-1 1" forcelimited="true" />
+		<velocity name="A_middle_proximal" class="Generic" joint="MPJ"  ctrlrange="0 0.01" forcerange="-1 1" forcelimited="true" />
+		<velocity name="A_ring_proximal"   class="Generic" joint="RPJ"  ctrlrange="0 0.01" forcerange="-1 1" forcelimited="true" />
+        <velocity name="A_pinky_proximal"  class="Generic" joint="PPJ"  ctrlrange="0 0.01" forcerange="-1 1" forcelimited="true" />
+	</actuator> -->
 </mujoco>

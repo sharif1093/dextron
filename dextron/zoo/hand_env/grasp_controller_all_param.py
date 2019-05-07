@@ -48,6 +48,7 @@ class GraspController:
 
     def step(self, action, physics):
         t = action
+        # t += np.random.rand() * 1
         # 1: Fully closed
         # 0: Fully open
         flag = False

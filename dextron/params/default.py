@@ -53,7 +53,7 @@ cpanel["gamma"] = 0.99     # The gamma parameter used in VecNormalize | Agent.pr
 cpanel["use_gae"] = True   # Whether to use GAE to calculate returns or not.
 cpanel["tau"] = 0.95       # The parameter used for calculating advantage function.
 cpanel["recurrent"] = False
-cpanel["actor_feature_size"] = 16
+cpanel["actor_feature_size"] = 64
 
 # Wrappers
 cpanel["add_monitor"]           = True  # Always useful, sometimes necessary.

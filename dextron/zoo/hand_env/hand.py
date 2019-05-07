@@ -16,7 +16,9 @@ import numpy as np
 
 from dextron.zoo.common import get_model_and_assets_by_name
 
-from .grasp_controller_all_param import GraspController
+from .grasp_controller_all_velocity import GraspController
+# from .grasp_controller_all_param import GraspController
+# from .grasp_controller_all_step import GraspController
 
 import sys
 
@@ -107,7 +109,6 @@ class Hand(base.Task):
         self.params = params
         super(Hand, self).__init__(random=self.params.get("random", None))
 
-
     def initialize_episode(self, physics):
         """Sets the state of the environment at the start of each episode.
         Do the following steps:
@@ -116,32 +117,8 @@ class Hand(base.Task):
         3. Assign the mocap pos: physics.named.data.mocap_pos["mocap"]
         4. Assign the mocap quat: physics.named.data.mocap_quat["mocap"]
         """
-        ###### print("\nEpisode restarted...")
-        # from pprint import pprint
-        # pprint(physics.named.data.ctrl)
-        # pprint(physics.named.model.actuator_ctrlrange)
-        # exit()
 
         self.grasper = GraspController(physics)
-        
-        
-        
-        # print("--- Inertia of long_cylinder:", physics.named.model.body_inertia["long_cylinder"])
-        # print("--- Mass of long_cylinder:", physics.named.model.body_mass["long_cylinder"])
-
-
-        # randomizers.randomize_limited_and_rotational_joints(physics, self.random)
-        # self._timeout_progress = 0
-
-        # from pprint import pprint
-        # pprint(dir(physics.model))
-        ########## print("<<< ENVIRONMENT WAS RESET >>>")
-        ### print("mocap_pos  for mocap:", physics.named.data.mocap_pos["mocap"])
-        ### print("mocap_quat for mocap:", physics.named.data.mocap_quat["mocap"])
-        # print("number of mocap bodies:", physics.model.nmocap)
-
-        # Initialize the mocap location:
-        # physics.named.data.mocap_pos["mocap"] = np.array([.1,.1,.1], dtype=np.float32) # .01*self.random.randn()
         
         
         ##############################
@@ -151,14 +128,15 @@ class Hand(base.Task):
         # For 10% of all times, start from a grasped position.
         offset = np.array([0,0.015,0], dtype=np.float32)
         if a1 > 1: # 0.8
-            # This part is not executed at all for now.
-            start_point = np.array([0.02, 0.00, 0.1], dtype=np.float32)
+            # # This part is not executed at all for now.
+            # start_point = np.array([0.02, 0.00, 0.1], dtype=np.float32)
 
-            points = []
-            points.append(start_point)
-            points.append(np.array([0.02,  0.00,  0.3], dtype=np.float32))
+            # points = []
+            # points.append(start_point)
+            # points.append(np.array([0.02,  0.00,  0.3], dtype=np.float32))
 
-            times = [self.params["environment_kwargs"]["time_limit"]/3]
+            # times = [self.params["environment_kwargs"]["time_limit"]/3]
+            pass
 
         else:
             # a0 = np.random.rand() * 0.01
@@ -170,9 +148,14 @@ class Hand(base.Task):
 
             ## Randomizing initial position x&y on a quadcircle:
             
+            # r = np.random.rand() * 0.30 + 0.05
+            r = np.random.rand() * 0.35
+            # r = 0.35
             # theta = np.random.rand() * np.pi / 6
-            theta = np.pi / 7
-            start_point = np.array([-0.35*np.sin(theta), -0.35*np.cos(theta), 0.1], dtype=np.float32)
+            # theta = np.random.rand() * np.pi/3 - np.pi/6 + np.pi/7
+            theta = np.random.rand() * np.pi/14 + np.pi/14
+            # theta = np.pi / 7
+            start_point = np.array([-r * np.sin(theta), -r * np.cos(theta), 0.1], dtype=np.float32)
 
             points = []
             points.append(start_point)
@@ -181,6 +164,17 @@ class Hand(base.Task):
             
             times = [self.params["environment_kwargs"]["time_limit"]/2, self.params["environment_kwargs"]["time_limit"]/3]
 
+        
+        # Randomized initial finger positions by directly setting the joint values:
+        t = np.random.rand()
+        # t = 0
+        physics.named.data.qpos["TPJ"] = 0.57*t  # 0 0.57
+        physics.named.data.qpos["IPJ"] = 1.57*t  # 0 1.57
+        physics.named.data.qpos["MPJ"] = 1.57*t  # 0 1.57
+        physics.named.data.qpos["RPJ"] = 1.57*t  # 0 1.57
+        physics.named.data.qpos["PPJ"] = 1.57*t  # 0 1.57
+
+        # Setting the mocap position:
         physics.named.data.mocap_pos["mocap"] = start_point
         physics.named.data.xpos["base_link"] = start_point + offset
 
@@ -200,11 +194,11 @@ class Hand(base.Task):
         spec = collections.OrderedDict()
         # Setting actuator types, which is a BoundedArraySpec:
 
-        ## Position [continuous] control on individual actuators:
+        ## 1) Position [continuous] control on individual actuators:
         # spec["agent"] = mujoco.action_spec(physics)
-        ## Velocity [discrete] control for all fingers simultaneously:
+        ## 2) Velocity [discrete] control for all fingers simultaneously:
         # spec["agent"] = specs.BoundedArraySpec(shape=(1,), dtype=np.int, minimum=0, maximum=_NUM_ACTION)
-        ## Position control for all fingers simultaneously:
+        ## 3) Position control for all fingers simultaneously:
         spec["agent"] = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=0, maximum=1) # 1: Fully closed || 0: Fully open
 
         
@@ -258,89 +252,47 @@ class Hand(base.Task):
         """
 
         obs = collections.OrderedDict()
-        # # Ignores horizontal position to maintain translational invariance:
-        # obs['position'] = physics.data.qpos[1:].copy()
-        ## obs['position'] = physics.data.qpos[:].copy()
-        ## obs['velocity'] = physics.data.qvel[:].copy()
-        # obs['position'] = physics.position()
-        # obs['velocity'] = physics.velocity()
+        # Ignores horizontal position to maintain translational invariance:
+        obs['position'] = physics.data.qpos[:].copy()
+        obs['velocity'] = physics.data.qvel[:].copy()
 
-        # print("|position| =", len(obs['position']))
-        # print("|velocity| =", len(obs['velocity']))
-
-        # from pprint import pprint
-        # pprint(dir(physics.data))
-        # exit()
-        ## obs['mocap_pos'] = physics.data.mocap_pos[:].copy()
-        ##### obs['mocap_quat'] = physics.data.mocap_quat[:].copy()
-
-        ## What about the object??
         # obs['mocap_pos'] = physics.data.mocap_pos[:].copy()
         # obs['mocap_quat'] = physics.data.mocap_quat[:].copy()
 
-        ## obs['xpos_object'] = physics.named.data.xpos['long_cylinder'].copy()
+        # obs['xpos_object'] = physics.named.data.xpos['long_cylinder'].copy()
         # obs['xquat_object'] = physics.named.data.xquat['long_cylinder'].copy()
 
-        # print("shape of pos:", obs['position'].shape)
+        obs['rel_obj_hand'] = physics.data.mocap_pos[:].copy() - physics.named.data.xpos['long_cylinder'].copy()
+        obs['rel_obj_hand_dist'] = np.linalg.norm(physics.data.mocap_pos[:].copy() - physics.named.data.xpos['long_cylinder'].copy())
 
-        # obs['rel_obj_hand'] = obs['mocap_pos'] - obs['xpos_object']
+        # TODO: Velocity of the hand
+        # TODO: Relative object/hand velocity
 
-        ## obs['rel_obj_hand'] = physics.data.mocap_pos[:].copy() - physics.named.data.xpos['long_cylinder'].copy()
+        # obs['time'] = np.array(physics.time())
 
-        # print("time =", physics.timestep())
-        obs['time'] = np.array(physics.time())
-
-        # print("type = ", physics.named.data.xpos['long_cylinder'])
-        # exit()
-
-        # if (obs['xpos'][0] != 0) and (obs['xpos'][1] != 0) and (obs['xpos'][2] != 0):
-        #     print('xpos =', obs['xpos'])
-        #     print('xquat =', obs['xquat'])
-
-
-        ## obs['touch'] = physics.touch()
+        # obs['touch'] = physics.touch()
         return obs
 
     def get_reward(self, physics):
         """Returns a reward applicable to the performed task."""
         height = physics.named.data.xipos['long_cylinder', 'z']
-        # reward = 10 * (height-0.125)
-        reward = 5 * (height - 0.325)
 
 
-        ##### print("reward = ", reward)
+        # tolerance(x, bounds=(0.0, 0.0), margin=0.0, sigmoid='gaussian', value_at_margin=0.1):
+        height_object = rewards.tolerance(height, bounds=(0.25,np.inf), margin=0)
+        # height_object = (1 + height_object)/2
 
-        # If the action is causing early termination, it should be penalized for that!
-        if self.get_termination(physics) == 0.0:
-            reward = -(6-physics.time())*5
-    
-        # from pprint import pprint
-        # print(">>>>", physics.named.model.qpos0['long_cylinder']) 
-        # print(physics.named.model.qpos0.item())
+        reward = height_object
+        
+        # Commands of the agent to the robot in the current step:      physics.control()
 
-        # standing = rewards.tolerance(physics.height(), (_STAND_HEIGHT, 2))
-        # if self._hopping:
-        #     hopping = rewards.tolerance(physics.speed(),
-        #                                 bounds=(_HOP_SPEED, float('inf')),
-        #                                 margin=_HOP_SPEED/2,
-        #                                 value_at_margin=0.5,
-        #                                 sigmoid='linear')
-        #     return standing * hopping
-        # else:
-        #     small_control = rewards.tolerance(physics.control(),
-        #                                       margin=1, value_at_margin=0,
-        #                                       sigmoid='quadratic').mean()
-        #     small_control = (small_control + 4) / 5
-        #     return standing * small_control
+        # TODO: With velocity-based controllers we can penalize the amount of actuation sent
+        #       to actuators. We can penalize the sum over absolute values of finger actuations.
+
+        # touch_data = np.log1p(self.named.data.sensordata[['touch_toe', 'touch_heel']])
         # if reward < 0:
         #     physics._reset_next_step = True
         #     # pass
-        
-        
-        # if reward < -.1 or reward > 1:
-        #     print("HERE WE ARE RESETTING ...")
-        #     physics.reset()
-        #     reward = 0
         return reward
     
     def get_termination(self, physics):
