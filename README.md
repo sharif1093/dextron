@@ -9,6 +9,8 @@ for solving the dexterous prosthetic hand manipulation.
 # A typical training
 python -m digideep.main --save-modules "dextron" --params dextron.params.default --cpanel '{"time_limit":6}'
 
+python -m digideep.main --save-modules "dextron" --params dextron.params.default --cpanel '{"time_limit":6, "entropy_coef":0}'
+
 # Loading
 python -m digideep.main --play --load-checkpoint "<path-to-checkpoint>"
 
