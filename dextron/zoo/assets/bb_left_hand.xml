@@ -150,6 +150,8 @@
         <body childclass="Generic" name="base_link" pos="0 -0.335 0.2" quat="3.1415 0 3.1415 0" > <!-- quat="2.36 0 3.1415 0" -->
             <joint type="free" damping="0" armature="0" limited="false"/>
 
+            <site name="palm_center" pos="0 0.09 0.03"/>
+
             <inertial pos="-0.00393916 0.0601545 -0.000633525" mass="0.218885" diaginertia="1e-05 1e-05 1e-05" />
             <geom type="mesh" rgba="0.752941 0.752941 0.752941 1" mesh="base_link" />
             <body name="PPL" pos="0.0291239 0.109021 -0.00240167" quat="0.583861 0.517036 0.414965 0.468598">
@@ -265,6 +267,11 @@
 	</sensor>
 
 
+    <contact>
+        <exclude name="EX_base_thumb_p" body1="base_link" body2="TPL" />
+        <!-- <exclude name="EX_base_thumb_c" body1="base_link" body2="TCL" /> -->
+        <!-- <exclude name="EX_thumb_c_p" body1="TCL" body2="TPL" /> -->
+    </contact>
 
 
 
@@ -319,13 +326,15 @@
     
     <!-- Are the joints initialized randomly? -->
     <!-- Reference: http://www.mujoco.org/book/XMLreference.html#velocity -->
+    <!-- ctrlrange in position actuators is of dimension of position. -->
+    <!-- ctrlrange in velocity actuators is of dimension of velocity. -->
     <actuator>
-        <position name="A_thumb_C"         class="Generic" joint="TCJ"  ctrlrange="0 1.05"/>
-        <velocity name="A_thumb_proximal"  class="Generic" joint="TPJ"  ctrlrange="-0.5 0.5" forcerange="-1 1" forcelimited="true" gear="-1 0 0 0 0 0"/>
-		<velocity name="A_index_proximal"  class="Generic" joint="IPJ"  ctrlrange="-0.5 0.5" forcerange="-1 1" forcelimited="true" />
-		<velocity name="A_middle_proximal" class="Generic" joint="MPJ"  ctrlrange="-0.5 0.5" forcerange="-1 1" forcelimited="true" />
-		<velocity name="A_ring_proximal"   class="Generic" joint="RPJ"  ctrlrange="-0.5 0.5" forcerange="-1 1" forcelimited="true" />
-        <velocity name="A_pinky_proximal"  class="Generic" joint="PPJ"  ctrlrange="-0.5 0.5" forcerange="-1 1" forcelimited="true" />
+        <position name="A_thumb_C"         class="Generic" joint="TCJ"  ctrlrange=" 0 1.05"/>
+        <velocity name="A_thumb_proximal"  class="Generic" joint="TPJ"  ctrlrange="-1 1" forcerange="-2 2" forcelimited="true" gear="-1 0 0 0 0 0"/>
+		<velocity name="A_index_proximal"  class="Generic" joint="IPJ"  ctrlrange="-1 1" forcerange="-1 1" forcelimited="true" />
+		<velocity name="A_middle_proximal" class="Generic" joint="MPJ"  ctrlrange="-1 1" forcerange="-1 1" forcelimited="true" />
+		<velocity name="A_ring_proximal"   class="Generic" joint="RPJ"  ctrlrange="-1 1" forcerange="-1 1" forcelimited="true" />
+        <velocity name="A_pinky_proximal"  class="Generic" joint="PPJ"  ctrlrange="-1 1" forcerange="-1 1" forcelimited="true" />
 	</actuator>
 
     <!-- <actuator>
