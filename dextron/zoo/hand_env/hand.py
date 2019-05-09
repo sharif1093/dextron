@@ -1,38 +1,51 @@
-"""Hopper domain."""
+"""Hand environment.
+todo:
+    Make the naive controller work with the cylinder object.
+      * Make sure the distances are calculated properly (not considering z coordinate into account.)
+      * Make sure the hand-closure is calculated properly.
+      * Make sure the interface between GraspController/NaiveController is correct.
+      * Calculate complex states in the upstream physics instance.
+"""
 
+
+
+
+# Are we in python2?
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 import collections
+import numpy as np
+import sys
 
 from dm_control import mujoco
 from dm_control.rl import control
+from dm_control.rl import specs
 from dm_control.suite import base
 from dm_control.suite.utils import randomizers
 from dm_control.utils import rewards
-from dm_control.rl import specs
-import numpy as np
+
 
 from dextron.zoo.common import get_model_and_assets_by_name
 
-from .grasp_controller_all_velocity import GraspController
-# from .grasp_controller_all_param import GraspController
-# from .grasp_controller_all_step import GraspController
+from .grasp_controllers import GraspControllerAllVelocity
+from .grasp_controllers import GraspControllerAllPosition
+from .grasp_controllers import GraspControllerAllStep
 
-import sys
+from .naive_controller import NaiveController
 
-#####################
-## MODEL CONSTANTS ##
-#####################
+######################################################################################
+## Model Constants and Tasks ##
+###############################
 _MODEL_NAME = "bb_left_hand"
-_NUM_ACTION = 2
+_GRASP_CONTROLLER = GraspControllerAllVelocity
+# _NUM_ACTION = 2
 
 # We want to delay actual running of this function until the last moment.
 # Moreover, we can use this "get_model_and_assets" in different tasks if
 # we have more than one.
 get_model_and_assets = lambda: get_model_and_assets_by_name(_MODEL_NAME)
-
 
 def grasp(**params): # environment_kwargs=None, 
     """Returns a Hand that strives."""
@@ -47,28 +60,77 @@ def grasp(**params): # environment_kwargs=None,
 # Add functions that can help your observation.
 class Physics(mujoco.Physics):
     """Physics simulation with additional features for the Hand domain."""
-    pass
-    # def object_height(self):
+    
+    def get_distance_in_xy_plane(self):
+        # We need the distance only in xy plane.
+        # Only the first two elements.
+        
+        # mocap = self.named.data.mocap_pos["mocap"].copy()
+        palm_center = self.named.data.site_xpos["palm_center"].copy()
+        long_cylinder = self.named.data.xpos['long_cylinder'].copy()
 
-    # def mocapPos(self):
-    #     return self.named
-#     def height(self):
-#         """Returns height of torso with respect to foot."""
-#         return (self.named.data.xipos['torso', 'z'] -
-#                 self.named.data.xipos['foot', 'z'])
+        # dist = np.linalg.norm(mocap[0:2] - long_cylinder[0:2])
+        dist = np.linalg.norm(palm_center[0:2] - long_cylinder[0:2])
+        
+        
+        # self.data.mocap_pos[:].copy()
+        return dist
 
-#     def speed(self):
-#         """Returns horizontal speed of the Hopper."""
-#         return self.named.data.sensordata['torso_subtreelinvel'][0]
+    def get_joint_qpos(self, joint_name):
+        return self.named.data.qpos[joint_name]
 
-#     def touch(self):
-#         """Returns the signals from two foot touch sensors."""
-#         return np.log1p(self.named.data.sensordata[['touch_toe', 'touch_heel']])
+    # def get_joint_qpos_vec(self, joint_name_vec):
+    #     joint_qpos_vec = np.zeros(shape=(len(joint_name_vec),))
+    #     for index in range(len(joint_name_vec)):
+    #         joint_qpos_vec[index] = self.get_joint_qpos(joint_name_vec[index])
+    #     return joint_qpos_vec
 
+    # def get_joint_specs(self, joint_name, joint_dir):
+    #     joint_range = self.named.model.jnt_range[joint_name]
+    #     joint_min = joint_range[0 if joint_dir>0 else 1] * joint_dir
+    #     joint_max = joint_range[1 if joint_dir>0 else 0] * joint_dir
+    #     return joint_min, joint_max
+
+    def get_digit_closure(self, joint_name, joint_dir):
+        # joint_min, joint_max = self.get_joint_specs(joint_name)
+        joint_range = self.named.model.jnt_range[joint_name]
+        joint_min = joint_range[0 if joint_dir>0 else 1] * joint_dir
+        joint_max = joint_range[1 if joint_dir>0 else 0] * joint_dir
+
+        joint_angle = self.get_joint_qpos(joint_name)
+        
+        joint_value = joint_angle * joint_dir
+        # TODO: Because of saturation and different actuator ranges, the thumb
+        #       moves faster than other fingers. So to compute hand_closure, we
+        #       factor out all actuators of thumb altogether.
+        joint_closure = (joint_value-joint_min) / (joint_max - joint_min)
+        return joint_closure
+
+    def get_hand_closure(self):
+        # joint_names = ["TCJ", "TPJ", "IPJ", "MPJ", "RPJ", "PPJ"]
+        joint_names = ["TPJ", "IPJ", "MPJ", "RPJ", "PPJ"]
+        joint_dirs  = np.array([-1, 1, 1, 1, 1], dtype=np.float) # Can only be 1 or -1
+        joint_closures = np.zeros(shape=(len(joint_names),))
+        for index in range(len(joint_names)):
+            joint_closures[index] = self.get_digit_closure(joint_names[index], joint_dirs[index])
+        hand_closure = np.max(joint_closures)
+        # hand_closure = np.mean(joint_closures)
+        return hand_closure
+
+    # def get_digit_contact_forces(self)
+
+# Possible patterns:
+#   * Height of torso with respect to foot: (self.named.data.xipos['torso', 'z'] - self.named.data.xipos['foot', 'z'])
+#   * Horizontal speed of the Hopper:       self.named.data.sensordata['torso_subtreelinvel'][0]
+#   * Signals from two foot touch sensors:  np.log1p(self.named.data.sensordata[['touch_toe', 'touch_heel']])
 
 ######################################################################################
-#### Trajectory Generator ####
-##############################
+#### Utility Functions ####
+###########################
+
+########################
+# Trajectory Generator #
+########################
 def gen_traj_min_jerk(point_start, point_end, T, dt):
     t = 0
     R = 0.01*T
@@ -107,6 +169,7 @@ class Hand(base.Task):
                 automatically (default).
         """
         self.params = params
+        self.mode = None # "training" | "teaching"
         super(Hand, self).__init__(random=self.params.get("random", None))
 
     def initialize_episode(self, physics):
@@ -118,12 +181,22 @@ class Hand(base.Task):
         4. Assign the mocap quat: physics.named.data.mocap_quat["mocap"]
         """
 
-        self.grasper = GraspController(physics)
+        self.grasper = _GRASP_CONTROLLER(physics)
+        self.mode = "teaching"
+        # self.mode = "training"
         
-        
-        ##############################
-        ### Randomize a Trajectory ###
-        ##############################
+        #############################
+        ### Mode-related settings ###
+        #############################
+        if self.mode == "teaching":
+            self.teacher = NaiveController(self.action_spec(physics))
+        elif self.mode == "training":
+            self.teacher = None
+
+
+        #########################################
+        ### Randomizations of the environment ###
+        #########################################
         a1 = np.random.rand()
         # For 10% of all times, start from a grasped position.
         offset = np.array([0,0.015,0], dtype=np.float32)
@@ -148,8 +221,10 @@ class Hand(base.Task):
 
             ## Randomizing initial position x&y on a quadcircle:
             
+            # NOTE: Don't start too close, give the agent some time.
+            r = np.random.rand() * 0.25 + 0.1
             # r = np.random.rand() * 0.30 + 0.05
-            r = np.random.rand() * 0.35
+            # r = np.random.rand() * 0.35 + 0
             # r = 0.35
             # theta = np.random.rand() * np.pi / 6
             # theta = np.random.rand() * np.pi/3 - np.pi/6 + np.pi/7
@@ -165,10 +240,12 @@ class Hand(base.Task):
             times = [self.params["environment_kwargs"]["time_limit"]/2, self.params["environment_kwargs"]["time_limit"]/3]
 
         
+        # NOTE: I noticed that qpos initializations do not always work as expected.
+        #       Sometimes they just do not go the the given values.
         # Randomized initial finger positions by directly setting the joint values:
-        t = np.random.rand()
-        # t = 0
-        physics.named.data.qpos["TPJ"] = 0.57*t  # 0 0.57
+        # t = np.random.rand()
+        t = 0.5
+        physics.named.data.qpos["TPJ"] = -0.57*t #-0.57 0
         physics.named.data.qpos["IPJ"] = 1.57*t  # 0 1.57
         physics.named.data.qpos["MPJ"] = 1.57*t  # 0 1.57
         physics.named.data.qpos["RPJ"] = 1.57*t  # 0 1.57
@@ -199,7 +276,9 @@ class Hand(base.Task):
         ## 2) Velocity [discrete] control for all fingers simultaneously:
         # spec["agent"] = specs.BoundedArraySpec(shape=(1,), dtype=np.int, minimum=0, maximum=_NUM_ACTION)
         ## 3) Position control for all fingers simultaneously:
-        spec["agent"] = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=0, maximum=1) # 1: Fully closed || 0: Fully open
+        # spec["agent"] = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=0, maximum=1) # 1: Fully closed || 0: Fully open
+        ## 4) Velocity control (continuous) for all fingers simultaneously:
+        spec["agent"] = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
 
         
         # physics.model.nmocap
@@ -228,10 +307,18 @@ class Hand(base.Task):
         # Setting the actuators to move. It calls physics.set_control
         # on the actuators to set their values:
         
-        ctrl_actions = self.grasper(action["agent"], physics)
-        super(Hand, self).before_step(ctrl_actions, physics)
+        if self.mode == "training":
+            ctrl_actions = self.grasper(action["agent"], physics)
+            super(Hand, self).before_step(ctrl_actions, physics)
+        elif self.mode == "teaching":
+            # 1) Take the teacher step
+            actions = self.teacher.step(physics)
+            # 2) Give the actions to the grasper for lower level translation.
+            ctrl_actions = self.grasper(actions, physics)
+            # 3) Send lowest-level actions for execution in the simulator.
+            super(Hand, self).before_step(ctrl_actions, physics)
+        
         # Setting the mocap bodies to move:
-
         try:
             mocap_pos, mocap_vel, mocap_acc = next(self.mocap_traj[self.mocap_traj_index])
             physics.named.data.mocap_pos["mocap"] = mocap_pos
