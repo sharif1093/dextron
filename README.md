@@ -8,6 +8,7 @@ for solving the dexterous prosthetic hand manipulation.
 ```bash
 # A typical training
 python -m digideep.main --save-modules "dextron" --params dextron.params.default --cpanel '{"time_limit":6}'
+# python -m digideep.main --save-modules "dextron" --params dextron.params.sac2 --cpanel '{"time_limit":6}'
 
 python -m digideep.main --save-modules "dextron" --params dextron.params.default --cpanel '{"time_limit":6, "entropy_coef":0}'
 
@@ -20,6 +21,19 @@ PYTHONPATH="<path-to-session>/modules" python -m digideep.main --play --load-che
 # Visualizing model
 python -m digideep.environment.play --module "dextron.zoo" --model "DMCHandGrasp-v0"
 
+```
+
+## `vscode` settings
+
+``` json
+{
+    "workbench.colorTheme": "Default Light+",
+    "terminal.integrated.shell.linux": "zsh",
+    "gitlens.advanced.messages": {
+        "suppressShowKeyBindingsNotice": true
+    },
+    "gitlens.historyExplorer.enabled": true
+}
 ```
 
 ## Parameters important in exploration/exploitation trade-off
