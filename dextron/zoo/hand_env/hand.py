@@ -33,8 +33,6 @@ from .grasp_controllers import GraspControllerAllVelocity
 from .grasp_controllers import GraspControllerAllPosition
 from .grasp_controllers import GraspControllerAllStep
 
-from .naive_controller import NaiveController
-
 ######################################################################################
 ## Model Constants and Tasks ##
 ###############################
@@ -182,17 +180,16 @@ class Hand(base.Task):
         """
 
         self.grasper = _GRASP_CONTROLLER(physics)
-        self.mode = "teaching"
-        # self.mode = "training"
         
-        #############################
-        ### Mode-related settings ###
-        #############################
-        if self.mode == "teaching":
-            self.teacher = NaiveController(self.action_spec(physics))
-        elif self.mode == "training":
-            self.teacher = None
-
+        random_mode_selection = np.random.rand()
+        
+        if random_mode_selection > 0.5:
+            self.mode = "teaching"
+            print("--------- TEACHING MODE ---------")
+        else:
+            self.mode = "training"
+            print("+++++++++ TRAINING MODE +++++++++")
+        # print("Distance to hand is = ", physics.get_distance_in_xy_plane())
 
         #########################################
         ### Randomizations of the environment ###
@@ -253,6 +250,7 @@ class Hand(base.Task):
 
         # Setting the mocap position:
         physics.named.data.mocap_pos["mocap"] = start_point
+        # The following doesn't seem to be working successfully:
         physics.named.data.xpos["base_link"] = start_point + offset
 
         self.mocap_traj = []
@@ -278,7 +276,8 @@ class Hand(base.Task):
         ## 3) Position control for all fingers simultaneously:
         # spec["agent"] = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=0, maximum=1) # 1: Fully closed || 0: Fully open
         ## 4) Velocity control (continuous) for all fingers simultaneously:
-        spec["agent"] = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
+        spec["agent"]        = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
+        spec["demonstrator"] = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
 
         
         # physics.model.nmocap
@@ -309,14 +308,11 @@ class Hand(base.Task):
         
         if self.mode == "training":
             ctrl_actions = self.grasper(action["agent"], physics)
-            super(Hand, self).before_step(ctrl_actions, physics)
         elif self.mode == "teaching":
-            # 1) Take the teacher step
-            actions = self.teacher.step(physics)
-            # 2) Give the actions to the grasper for lower level translation.
-            ctrl_actions = self.grasper(actions, physics)
-            # 3) Send lowest-level actions for execution in the simulator.
-            super(Hand, self).before_step(ctrl_actions, physics)
+            ctrl_actions = self.grasper(action["demonstrator"], physics)
+        
+        # 3) Send lowest-level actions for execution in the simulator.
+        super(Hand, self).before_step(ctrl_actions, physics)
         
         # Setting the mocap bodies to move:
         try:
@@ -336,12 +332,23 @@ class Hand(base.Task):
     def get_observation(self, physics):
         """Returns an observation of positions, velocities and touch sensors.
         We also include "info" in the observation. "info" must be a dictionary.
-        """
 
+        Note:
+            Nested dictionaries will not work with observations if used with flatten_observations.
+            However, info can handle nested structures even with flatten_observations.
+        
+        Todo:
+            Write a new flatten_observation function that can flatten nested observation dictionaries.
+        """
         obs = collections.OrderedDict()
+
+        #############################
+        ### agent ###
+        #############
         # Ignores horizontal position to maintain translational invariance:
-        obs['position'] = physics.data.qpos[:].copy()
-        obs['velocity'] = physics.data.qvel[:].copy()
+        obs["agent"] = collections.OrderedDict()
+        obs["agent"]['position'] = physics.data.qpos[:].copy()
+        obs["agent"]['velocity'] = physics.data.qvel[:].copy()
 
         # obs['mocap_pos'] = physics.data.mocap_pos[:].copy()
         # obs['mocap_quat'] = physics.data.mocap_quat[:].copy()
@@ -349,15 +356,37 @@ class Hand(base.Task):
         # obs['xpos_object'] = physics.named.data.xpos['long_cylinder'].copy()
         # obs['xquat_object'] = physics.named.data.xquat['long_cylinder'].copy()
 
-        obs['rel_obj_hand'] = physics.data.mocap_pos[:].copy() - physics.named.data.xpos['long_cylinder'].copy()
-        obs['rel_obj_hand_dist'] = np.linalg.norm(physics.data.mocap_pos[:].copy() - physics.named.data.xpos['long_cylinder'].copy())
+        obs["agent"]['rel_obj_hand'] = physics.data.mocap_pos[:].copy() - physics.named.data.xpos['long_cylinder'].copy()
+        obs["agent"]['rel_obj_hand_dist'] = np.linalg.norm(physics.data.mocap_pos[:].copy() - physics.named.data.xpos['long_cylinder'].copy())
+
+        obs["agent"]['distance2'] = physics.get_distance_in_xy_plane()
 
         # TODO: Velocity of the hand
         # TODO: Relative object/hand velocity
 
-        # obs['time'] = np.array(physics.time())
+        # # obs['touch'] = physics.touch()
+        
+        #############################
+        ### demonstrator ###
+        ####################
+        obs["demonstrator"] = collections.OrderedDict()
+        obs['demonstrator']['distance'] = physics.get_distance_in_xy_plane()
+        obs['demonstrator']['hand_closure'] = physics.get_hand_closure()
 
-        # obs['touch'] = physics.touch()
+        #############################
+        ### status ###
+        ##############
+        # We are putting these information in status, because we want it promptly in the observations.
+        obs['status'] = collections.OrderedDict()
+        is_training = 1 if self.mode == "training" else 0
+        obs['status']['is_training'] = np.array(is_training)
+        # obs['status']['time'] = np.array(physics.time())
+
+        #############################
+        ### info ###
+        ############
+        # obs['info'] = collections.OrderedDict()
+
         return obs
 
     def get_reward(self, physics):
