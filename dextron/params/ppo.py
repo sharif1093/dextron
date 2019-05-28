@@ -1,17 +1,13 @@
 """
-Todo:
-    Compute the exploration/exploitation factor
-
 See Also:
     :ref:`ref-parameter-files`
 """
 
 import numpy as np
 from copy import deepcopy
-from collections import OrderedDict
 
 from digideep.environment import MakeEnvironment
-from digideep.utility.toolbox import get_module
+from collections import OrderedDict
 
 ################################################################################
 #########                       CONTROL PANEL                          #########
@@ -19,15 +15,35 @@ from digideep.utility.toolbox import get_module
 # The control panel brings the most important parameters to the top. It also
 # helps to set all parameters that depends on a single value from one specific
 # place:
-#  - We can print and save this control panel instead of parameter list:
+#  - We can print and save this control panel instead of parameter list.
 #  - The parameters here can also be taken from a YAML file.
 #  - We can have default values now very easily.
 #  - It provides semantic grouping of parameters
 #  - We may unify the name of parameters which are basically the same in different
 #    methods, but have different names.
 
+
 cpanel = OrderedDict()
 
+#####################
+### Runner Parameters
+# num_frames = 10e6  # Number of frames to train
+cpanel["epoch_size"]    = 2  # cycles
+cpanel["number_epochs"] = 100000
+cpanel["test_activate"] = False # Test Activate
+cpanel["test_interval"] = 10    # Test Interval Every #n Cycles
+cpanel["save_interval"] = 1     # Save Interval Every #n Cycles
+
+cpanel["seed"] = 0
+cpanel["cuda_deterministic"] = False # With TRUE we MIGHT get more deterministic results but at the cost of speed.
+
+#####################
+### Memory Parameters
+cpanel["memory_size_in_chunks"] = int(1) # SHOULD be 1 for on-policy methods that do not have a replay buffer.
+# SUGGESTIONS: 2^0 (~1e0) | 2^3 (~1e1) | 2^7 (~1e2) | 2^10 (~1e3) | 2^13 (~1e4) | 2^17 (1e5) | 2^20 (~1e6)
+
+##########################
+### Environment Parameters
 # cpanel["model_name"] = 'DMCHandGrasp-v0'
 # cpanel["from_module"] = 'dextron.zoo'
 
@@ -36,47 +52,41 @@ cpanel["from_params"] = True
 # Environment parameters
 cpanel["time_limit"] = 6
 
-
-# General Parameters
-# num_frames = 10e6  # Number of frames to train
-cpanel["epoch_size"]    = 2 # cycles
-cpanel["number_epochs"] = 100000
-cpanel["test_activate"] = False  # Test Activate
-cpanel["test_interval"] = 10    # Test Interval
-cpanel["save_interval"] = 1     # Save Interval
-
-cpanel["seed"] = 0
-cpanel["cuda_deterministic"] = False # With TRUE we MIGHT get more deterministic results but at the cost of speed.
-cpanel["memory_size_in_chunks"] = 1 # MUST be 1 for PPO/A2C/ACKTR. SUGGESTIONS: 2^0 (~1) | 2^3 (~10) | 2^7 (~100) | 2^10 (~1000) | 2^13 (~10000)
-
+cpanel["observation_key"] = "/agent"
 cpanel["gamma"] = 0.99     # The gamma parameter used in VecNormalize | Agent.preprocess | Agent.step
+
+# # Wrappers
+# cpanel["add_time_step"]          = False # It is suggested for MuJoCo environments. It adds time to the observation vector. CANNOT be used with renders.
+# cpanel["add_image_transpose"]    = False # Necessary if training on Gym with renders, e.g. Atari games
+# cpanel["add_dummy_multi_agent"]  = True  # Necessary if the environment is not multi-agent (i.e. all dmc and gym environments),
+#                                          # to make it compatibl with our multi-agent architecture.
+# cpanel["add_vec_normalize"]      = False # NOTE: USE WITH CARE. Might be used with MuJoCo environments. CANNOT be used with rendered observations.
+# cpanel["add_frame_stack_axis"]   = False # Necessary for training on renders, e.g. Atari games. The nstack parameter is usually 4
+#                                          # This stacks frames at a custom axis. If the ImageTranspose is activated
+#                                          # then axis should be set to 0 for compatibility with PyTorch.
+# # TODO: Action normalizer and clipper
+
+
+##################################
+### Exploration/Exploitation Balance
+### Exploration (~ num_workers * n_steps)
+cpanel["num_workers"] = 1  # From Explorer           # Number of exploratory workers working together
+cpanel["n_steps"] = 256    # From Explorer           # Number of frames to produce
+### Exploitation (~ n_update * batch_size): [PPO_EPOCH] Number of times to perform PPO update, i.e. number of frames to process.
+cpanel["n_update"] = 4     # From Agents
+cpanel["batch_size"] = 128 # From Agents
+
+cpanel["num_mini_batches"] = 8
+
+
+
+#####################
+### Agents Parameters
 cpanel["use_gae"] = True   # Whether to use GAE to calculate returns or not.
 cpanel["tau"] = 0.95       # The parameter used for calculating advantage function.
 cpanel["recurrent"] = False
 cpanel["actor_feature_size"] = 64
 
-# Wrappers
-cpanel["add_monitor"]           = True  # Always useful, sometimes necessary.
-cpanel["add_time_step"]         = False # It is suggested for MuJoCo environments. It adds time to the observation vector. CANNOT be used with renders.
-cpanel["add_image_transpose"]   = False # Necessary if training on Gym with renders, e.g. Atari games
-cpanel["add_dummy_multi_agent"] = False # Necessary if the environment is not multi-agent (i.e. all dmc and gym environments),
-                                        # to make it compatibl with our multi-agent architecture.
-cpanel["add_vec_normalize"]     = True  # NOTE: USE WITH CARE. Might be used with MuJoCo environments. CANNOT be used with rendered observations.
-cpanel["add_frame_stack_axis"]  = False # Necessary for training on renders, e.g. Atari games. The nstack parameter is usually 4
-                                        # This stacks frames at a custom axis. If the ImageTranspose is activated
-                                        # then axis should be set to 0 for compatibility with PyTorch.
-# Wrapper Parameters
-cpanel["nstack"] = 4
-
-# EXPLORATION: num_workers * n_steps
-cpanel["num_workers"] = 1         # Number of exploratory workers working together
-cpanel["n_steps"] = 256           # Number of frames to produce
-# EXPLOITATION: [PPO_EPOCH] Number of times to perform PPO update, i.e. number of frames to process.
-cpanel["n_update"] = 4
-# batch_size = n_steps * num_workers = 32 * 4. Choose the num_mini_batches accordingly.
-cpanel["num_mini_batches"] = 8
-
-# Method Parameters
 cpanel["lr"] = 3e-4 # 2.5e-4 | 7e-4
 cpanel["eps"] = 1e-5 # Epsilon parameter used in the optimizer(s) (ADAM/RMSProp/...)
 
@@ -86,6 +96,7 @@ cpanel["entropy_coef"] = 0.00    # 0.01 # Entropy term coefficient
 cpanel["max_grad_norm"] = 0.50   # Max norm of gradients
 cpanel["use_clipped_value_loss"] = True
 
+# add_vec_normalize
 
 ################################################################################
 #########                      PARAMETER TREE                          #########
@@ -116,34 +127,46 @@ def gen_params(cpanel):
                                          }
     ##########
 
-    params["env"]["wrappers"] = {"add_monitor": cpanel["add_monitor"], 
-                                "add_time_step": cpanel["add_time_step"],
-                                "add_image_transpose": cpanel["add_image_transpose"],
-                                "add_dummy_multi_agent": cpanel["add_dummy_multi_agent"],
-                                "add_vec_normalize": cpanel["add_vec_normalize"],
-                                "add_frame_stack_axis": cpanel["add_frame_stack_axis"]
-                                }
-    params["env"]["wrappers_args"] = {}
-    params["env"]["wrappers_args"]["Monitor"] = {
-        "allow_early_resets":True, # We need it to allow early resets in the test environment.
-        "reset_keywords":(),
-        "info_keywords":()
-    }
-    params["env"]["wrappers_args"]["DummyMultiAgent"] = {
-        "agent_name":"agent" # The name to be used for the agent
-    }
-    params["env"]["wrappers_args"]["VecNormalize"] = {
-        "ob":True,
-        "ret":True,
-        # "clipob":10.,
-        # "cliprew":10.,
-        "gamma":cpanel["gamma"], # Gamma is important in case we have "ret".
-        # "epsilon":1e-8
-    }
-    params["env"]["wrappers_args"]["VecFrameStackAxis"] = {
-        "nstack":cpanel["nstack"], # By DQN Nature paper, it is called: phi length
-        "axis":0                   # Axis=0 is required when ImageTransposeWrapper is called on the Atari games.
-    }
+    
+    ##############################################
+    ### Normal Wrappers ###
+    #######################
+    norm_wrappers = []
+    
+    norm_wrappers.append(dict(name="digideep.environment.wrappers.normal.WrapperLevelDictObs",
+                              args={"path":cpanel["observation_key"],
+                              },
+                              enabled=False))
+    norm_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.WrapperNormalizeActDict",
+                              args={"paths":["agent"]},
+                              enabled=False))
+    ##############################################
+    ### Vector Wrappers ###
+    #######################
+    vect_wrappers = []
+
+    vect_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.VecNormalizeObsDict",
+                              args={"paths":[cpanel["observation_key"]],
+                                    "clip":5, # 10
+                                    "epsilon":1e-8
+                              },
+                              enabled=True))
+    vect_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.VecNormalizeRew",
+                              args={"clip":5, # 10
+                                    "gamma":cpanel["gamma"],
+                                    "epsilon":1e-8
+                              },
+                              enabled=True))
+    ##############################################
+    params["env"]["main_wrappers"] = {"Monitor":{"allow_early_resets":True, # We need it to allow early resets in the test environment.
+                                                 "reset_keywords":(),
+                                                 "info_keywords":()},
+                                      "WrapperDummyMultiAgent":{"agent_name":"agent"},
+                                      "WrapperDummyDictObs":{"observation_key":"agent"}
+                                     }
+    params["env"]["norm_wrappers"] = norm_wrappers
+    params["env"]["vect_wrappers"] = vect_wrappers
+
 
     menv = MakeEnvironment(session=None, mode=None, seed=1, **params["env"])
     params["env"]["config"] = menv.get_config()
@@ -176,6 +199,7 @@ def gen_params(cpanel):
     params["agents"]["agent"] = {}
     params["agents"]["agent"]["name"] = "agent"
     params["agents"]["agent"]["type"] = "digideep.agent.PPO"
+    params["agents"]["agent"]["observation_path"] = cpanel["observation_key"]
     params["agents"]["agent"]["methodargs"] = {}
     params["agents"]["agent"]["methodargs"]["n_steps"] = cpanel["n_steps"]  # Same as "num_steps" / T
     params["agents"]["agent"]["methodargs"]["n_update"] = cpanel["n_update"]  # Number of times to perform PPO update. Alternative name: PPO_EPOCH
@@ -194,13 +218,15 @@ def gen_params(cpanel):
                                                                   "use_gae":cpanel["use_gae"]}
     # It deletes the last element from the chunk
     params["agents"]["agent"]["sampler"]["truncate_datalists"] = {"n":1} # MUST be 1 to truncate last item: (T+1 --> T)
+    params["agents"]["agent"]["sampler"]["observation_path"] = params["agents"]["agent"]["observation_path"]
 
     #############
     ### Model ###
     #############
     agent_name = params["agents"]["agent"]["name"]
-    params["agents"]["agent"]["policyname"] = "digideep.policy.stochastic.Policy"
-    params["agents"]["agent"]["policyargs"] = {"obs_space": params["env"]["config"]["observation_space"],
+    observation_path = params["agents"]["agent"]["observation_path"]
+    params["agents"]["agent"]["policyname"] = "digideep.agent.policy.stochastic.Policy"
+    params["agents"]["agent"]["policyargs"] = {"obs_space": params["env"]["config"]["observation_space"][observation_path],
                                                "act_space": params["env"]["config"]["action_space"][agent_name],
                                                "modelname": "digideep.model.models.MLPModel",
                                                "modelargs": {"recurrent":cpanel["recurrent"], "output_size":cpanel["actor_feature_size"]}
