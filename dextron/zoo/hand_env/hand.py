@@ -166,7 +166,11 @@ class Hand(base.Task):
                 integer seed for creating a new `RandomState`, or None to select a seed
                 automatically (default).
         """
+        # print("Passed task parameters:", params)
         self.params = params
+        explorer_mode = self.params.get("mode", "train")
+        self.teaching_allowed = (explorer_mode=="train")
+
         self.mode = None # "training" | "teaching"
         super(Hand, self).__init__(random=self.params.get("random", None))
 
@@ -183,7 +187,7 @@ class Hand(base.Task):
         
         random_mode_selection = np.random.rand()
         
-        if random_mode_selection > 0.5:
+        if (random_mode_selection > 0.5) and (self.teaching_allowed):
             self.mode = "teaching"
             print("--------- TEACHING MODE ---------")
         else:
