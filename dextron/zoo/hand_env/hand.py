@@ -170,6 +170,9 @@ class Hand(base.Task):
         self.params = params
         explorer_mode = self.params.get("mode", "train")
         self.teaching_allowed = (explorer_mode=="train")
+        
+        self.teaching_rate = self.params.get("teaching_rate", 0.5)
+        print("Teaching Rate:", self.teaching_rate)
 
         self.mode = None # "training" | "teaching"
         super(Hand, self).__init__(random=self.params.get("random", None))
@@ -187,7 +190,8 @@ class Hand(base.Task):
         
         random_mode_selection = np.random.rand()
         
-        if (random_mode_selection > 0.5) and (self.teaching_allowed):
+        # For 20% of all times, start with a teacher mode.
+        if (random_mode_selection < self.teaching_rate) and (self.teaching_allowed):
             self.mode = "teaching"
             print("--------- TEACHING MODE ---------")
         else:
