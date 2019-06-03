@@ -32,10 +32,10 @@ cpanel = OrderedDict()
 ### Runner Parameters
 # num_frames = 10e6  # Number of frames to train
 cpanel["epoch_size"]    = 400  # cycles
-cpanel["number_epochs"] = 100000
-cpanel["test_activate"] = False # Test Activate
-cpanel["test_interval"] = 10    # Test Interval Every #n Cycles
-cpanel["save_interval"] = 1     # Save Interval Every #n Cycles
+cpanel["number_epochs"] = 1000
+cpanel["test_activate"] = True  # Test Activate
+cpanel["test_interval"] = 10    # Test Interval Every #n Epochs
+cpanel["save_interval"] = 10    # Save Interval Every #n Epochs
 
 cpanel["seed"] = 0
 cpanel["cuda_deterministic"] = False # With TRUE we MIGHT get more deterministic results but at the cost of speed.
@@ -64,6 +64,8 @@ cpanel["gamma"] = 0.99     # The gamma parameter used in VecNormalize | Agent.pr
 # cpanel["add_frame_stack_axis"]   = False # Necessary for training on renders, e.g. Atari games. The nstack parameter is usually 4
 #                                          # This stacks frames at a custom axis. If the ImageTranspose is activated
 #                                          # then axis should be set to 0 for compatibility with PyTorch.
+
+cpanel["teaching_rate"] = 0.9
 
 ##################################
 ### Exploration/Exploitation Balance
@@ -107,7 +109,7 @@ def gen_params(cpanel):
         from digideep.environment.dmc2gym.registration import EnvCreator
         from dextron.zoo.hand_env.hand import grasp
 
-        task_kwargs = {"random":None}
+        task_kwargs = {"random":None, "teaching_rate":cpanel["teaching_rate"]}
         environment_kwargs = {"time_limit":cpanel["time_limit"], "control_timestep":0.02}
         params["env"]["register_args"] = {"id":cpanel["model_name"],
                                           "entry_point":"digideep.environment.dmc2gym.wrapper:DmControlWrapper",
