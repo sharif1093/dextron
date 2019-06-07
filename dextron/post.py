@@ -6,6 +6,7 @@ import argparse
 
 # import time
 import numpy as np
+import pickle
 
 
 ## For loading a class by name
@@ -49,8 +50,30 @@ class PostPlot:
     def __init__(self, loader):
         self.loader = loader
         self.varlog = loader.getVarlogLoader()
+        
+        # KEY = "/explore/reward/train"
+        # print("Keys=", self.varlog[KEY].keys())
+        # Keys: ['epoch', 'frame', 'roll', 'std', 'num', 'min', 'max', 'sum']
 
     def plot_reward(self, mode="train"):
+        """
+        This function plots the reward function and saves the `.png`, `.pdf`, and `.pkl` files.
+        
+        To later reload the `.pkl` file, one can use the following (to change format, labels, etc.):
+
+        Example:
+
+            import matplotlib.pyplot as plt
+            %matplotlib notebook
+            import pickle
+            ax = pickle.load( open( "path_to_pkl_figure.pkl", "rb" ) )
+            ax.set_title("Alternative title")
+            plt.show()
+        
+        See:
+            https://stackoverflow.com/a/12734723
+
+        """
         fig, ax = plt.subplots( nrows=1, ncols=1 )  # create figure & 1 axis
 
         KEY = "/explore/reward/"+mode
@@ -59,13 +82,20 @@ class PostPlot:
         window_size = np.max([int(num/15),5])
         mean_loss_actor_ma = moving_average(mean_loss_actor, window_size=window_size, mode='full')
         epoch = self.varlog[KEY]["epoch"]
-        ax.plot(epoch, mean_loss_actor, linewidth=1)
-        ax.plot(epoch, mean_loss_actor_ma, linewidth=1.5)
-        ax.set_title(KEY)
-        ax.set_ylabel(KEY)
-        ax.set_xlabel("epoch")
-        # fig.savefig(os.path.join(self.loader.getPlotsPath, "test.png"), bbox_inches='tight')
-        fig.savefig(os.path.join(self.loader.getPlotsPath, get_os_name(KEY)+".pdf"), bbox_inches='tight')
+        frame = self.varlog[KEY]["frame"] / 1e6
+
+        ax.plot(frame, mean_loss_actor, linewidth=1)
+        ax.plot(frame, mean_loss_actor_ma, linewidth=1.5)
+        ax.set_title(mode.capitalize()+" time return")
+        ax.set_ylabel("return (sum of rewards)")
+        ax.set_xlabel("million frames")
+        # ax.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
+        png_file = os.path.join(self.loader.getPlotsPath, get_os_name(KEY)+".png")
+        pdf_file = os.path.join(self.loader.getPlotsPath, get_os_name(KEY)+".pdf")
+        pkl_file = os.path.join(self.loader.getPlotsPath, get_os_name(KEY)+".pkl")
+        fig.savefig(png_file, bbox_inches='tight', dpi=300)
+        fig.savefig(pdf_file, bbox_inches='tight')
+        pickle.dump(ax, open(pkl_file,'wb'))
         plt.close(fig)
     
 
