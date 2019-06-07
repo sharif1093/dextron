@@ -188,8 +188,11 @@ class Hand(base.Task):
 
         self.grasper = _GRASP_CONTROLLER(physics)
         
+        # # Overriding the teaching mode
+        # self.mode = "teaching"
+        # print("--------- TEACHING MODE ---------")
+
         random_mode_selection = np.random.rand()
-        
         # For 20% of all times, start with a teacher mode.
         if (random_mode_selection < self.teaching_rate) and (self.teaching_allowed):
             self.mode = "teaching"
