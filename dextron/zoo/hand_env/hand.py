@@ -169,7 +169,8 @@ class Hand(base.Task):
         # print("Passed task parameters:", params)
         self.params = params
         explorer_mode = self.params.get("mode", "train")
-        self.teaching_allowed = (explorer_mode=="train")
+        # Here we first try to ping "allow_demos". If it is absent we see if mode is "train". Then we allow training otherwise no.
+        self.teaching_allowed = self.params.get("allow_demos", (explorer_mode=="train"))
         
         self.teaching_rate = self.params.get("teaching_rate", 0.5)
         print("Teaching Rate:", self.teaching_rate)
