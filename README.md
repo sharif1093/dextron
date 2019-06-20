@@ -6,19 +6,29 @@ for solving the dexterous prosthetic hand manipulation.
 ## Command-line execution
 
 ```bash
-# A typical training
+## Train mode, With session: A typical training
 python -m digideep.main --save-modules "dextron" --params dextron.params.default --cpanel '{"time_limit":6}'
 # python -m digideep.main --save-modules "dextron" --params dextron.params.sac2 --cpanel '{"time_limit":6}'
 
 python -m digideep.main --save-modules "dextron" --params dextron.params.default --cpanel '{"time_limit":6, "entropy_coef":0}'
 
-# Loading
+## Train mode, No session: Training in dry-run mode (i.e. no sessions will be created).
+python -m digideep.main --save-modules "dextron" --params dextron.params.sac --cpanel '{"time_limit":6, "teaching_rate":0.9}' --dry-run
+
+## Eval mode, No session: Playing in dry-run mode (i.e. playing the randomly initialized policy in 'eval' mode.)
+python -m digideep.main --save-modules "dextron" --params dextron.params.sac --cpanel '{"time_limit":6, "teaching_rate":0.9, "allow_demos":true}' --dry-run --play
+# Here, 'allow_demos' will force the "teaching-mode" to be allowed.
+
+## Eval mode, With session: Playing the initial policy with sessions stored.
+python -m digideep.main --save-modules "dextron" --params dextron.params.sac --cpanel '{"time_limit":6, "teaching_rate":0.9, "allow_demos":true}' --play
+
+## Eval mode, With session, With loading: Loading from a checkpoint
 python -m digideep.main --play --load-checkpoint "<path-to-checkpoint>"
 
 # Loading a saved checkpoint using its saved modules
 PYTHONPATH="<path-to-session>/modules" python -m digideep.main --play --load-checkpoint "<path-to-checkpoint>"
 
-# Visualizing model
+## Visualizing model
 python -m digideep.environment.play --module "dextron.zoo" --model "DMCHandGrasp-v0"
 
 ```
