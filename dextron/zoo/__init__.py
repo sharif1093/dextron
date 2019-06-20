@@ -21,14 +21,15 @@ from gym.envs.registration import register
 _CONTROL_TIMESTEP = .02 # (Seconds)
 _DEFAULT_TIME_LIMIT = 6 # Default duration of an episode, in seconds.
 
-task_kwargs = {"random":None}
+task_kwargs = {"random":None, "teaching_rate":0.5}
 environment_kwargs = {"time_limit":_DEFAULT_TIME_LIMIT, "control_timestep":_CONTROL_TIMESTEP}
 
 register(
     id="DMCHandGrasp-v0",
     entry_point="digideep.environment.dmc2gym.wrapper:DmControlWrapper",
     kwargs={'dmcenv_creator':EnvCreator(grasp, task_kwargs=task_kwargs, environment_kwargs=environment_kwargs, visualize_reward=True),
-            'flat_observation':True
+            'flat_observation':False,
+            'observation_key':"agent"
            }
 )
 
