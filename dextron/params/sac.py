@@ -298,7 +298,7 @@ def gen_params(cpanel):
     params["explorer"]["train"]["render"] = False
     params["explorer"]["train"]["render_delay"] = 0
     params["explorer"]["train"]["seed"] = cpanel["seed"] # + 3500
-    params["explorer"]["train"]["extra_env_kwargs"] = {"mode":params["explorer"]["train"]["mode"]}
+    params["explorer"]["train"]["extra_env_kwargs"] = {"mode":params["explorer"]["train"]["mode"], "allow_demos":True}
 
     params["explorer"]["test"] = {}
     params["explorer"]["test"]["mode"] = "test"
@@ -311,7 +311,7 @@ def gen_params(cpanel):
     params["explorer"]["test"]["render"] = False
     params["explorer"]["test"]["render_delay"] = 0
     params["explorer"]["test"]["seed"] = cpanel["seed"] + 100 # We want to make the seed of test environments different from training.
-    params["explorer"]["test"]["extra_env_kwargs"] = {"mode":params["explorer"]["test"]["mode"]}
+    params["explorer"]["test"]["extra_env_kwargs"] = {"mode":params["explorer"]["test"]["mode"], "allow_demos":False}
 
     params["explorer"]["eval"] = {}
     params["explorer"]["eval"]["mode"] = "eval"
@@ -324,7 +324,7 @@ def gen_params(cpanel):
     params["explorer"]["eval"]["render"] = True
     params["explorer"]["eval"]["render_delay"] = 0
     params["explorer"]["eval"]["seed"] = cpanel["seed"] + 101 # We want to make the seed of eval environment different from test/train.
-    params["explorer"]["eval"]["extra_env_kwargs"] = {"mode":params["explorer"]["eval"]["mode"]}
+    params["explorer"]["eval"]["extra_env_kwargs"] = {"mode":params["explorer"]["eval"]["mode"], "allow_demos":cpanel.get("allow_demos", False)}
     ##############################################
 
     return params
