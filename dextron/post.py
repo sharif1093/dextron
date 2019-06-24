@@ -104,7 +104,7 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser()
     
     parser.add_argument('--session-dirs', metavar=('<path>'), default='/tmp/digideep_sessions', type=str, help="The root directory of sessions.")
-    parser.add_argument('--session-name', metavar=('<name>'), default='', type=str, help="The name of the saved session.")
+    parser.add_argument('--session-name', metavar=('<name>'), type=str, help="The name of the saved session.")
 
     # parser.add_argument('--arg', metavar=('<pattern>'), nargs='?', const='', type=str, help="")
     # parser.add_argument('--arg', metavar=('<n>'), default=X, type=int, help="")
