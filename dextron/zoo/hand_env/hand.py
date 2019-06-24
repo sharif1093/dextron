@@ -30,14 +30,15 @@ from dm_control.utils import rewards
 from dextron.zoo.common import get_model_and_assets_by_name
 
 from .grasp_controllers import GraspControllerAllVelocity
-from .grasp_controllers import GraspControllerAllPosition
-from .grasp_controllers import GraspControllerAllStep
+from .grasp_controllers import GraspControllerIndividualVelocity
+# from .grasp_controllers import GraspControllerAllPosition
+# from .grasp_controllers import GraspControllerAllStep
 
 ######################################################################################
 ## Model Constants and Tasks ##
 ###############################
 _MODEL_NAME = "bb_left_hand"
-_GRASP_CONTROLLER = GraspControllerAllVelocity
+_GRASP_CONTROLLER = GraspControllerIndividualVelocity
 # _NUM_ACTION = 2
 
 # We want to delay actual running of this function until the last moment.
@@ -278,16 +279,21 @@ class Hand(base.Task):
 
     def action_spec(self, physics):
         """Returns a `BoundedArraySpec` matching the `physics` actuators."""
+        # TODO: "grasper" should be made here. Also, "grasper" should possibly determine the specs of agents.
         spec = collections.OrderedDict()
         # Setting actuator types, which is a BoundedArraySpec:
 
-        ## 1) Position [continuous] control on individual actuators:
+        ## 1) Position/Velocity [continuous] control on individual actuators:
         # spec["agent"] = mujoco.action_spec(physics)
         ## 2) Velocity [discrete] control for all fingers simultaneously:
         # spec["agent"] = specs.BoundedArraySpec(shape=(1,), dtype=np.int, minimum=0, maximum=_NUM_ACTION)
         ## 3) Position control for all fingers simultaneously:
         # spec["agent"] = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=0, maximum=1) # 1: Fully closed || 0: Fully open
         ## 4) Velocity control (continuous) for all fingers simultaneously:
+        # spec["agent"]        = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
+        # spec["demonstrator"] = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
+        ## 5) Velocity control (continuous) on individual fingers
+        # TODO: Different action shapes MUST produce an error!
         spec["agent"]        = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
         spec["demonstrator"] = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
 
