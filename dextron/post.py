@@ -1,13 +1,12 @@
 """A module used for post-processing of saved sessions.
 """
 
-import sys, os
+import sys, os, glob
 import argparse
 
 # import time
 import numpy as np
 import pickle
-
 
 ## For loading a class by name
 # from digideep.utility.toolbox import get_module
@@ -39,6 +38,23 @@ def get_os_name(path):
     path = path.replace("/", "_")
     return path
 
+
+def trim_to_shortest(signals):
+    length = len(signals[0])
+    for sig in signals:
+        length = min(len(sig), length)
+    
+    for k in range(len(signals)):
+        signals[k] = signals[k][:length]
+
+    return signals
+
+def get_signal_ma(signal, window_size=None):
+    num = len(signal)
+    window_size = window_size or np.max([int(num/15),5])
+    signal_ma = moving_average(signal, window_size=window_size, mode='full')
+    return signal_ma
+
 ## A class for plotting
 # https://stackoverflow.com/questions/9622163/save-plot-to-image-file-instead-of-displaying-it-using-matplotlib/9890599
 # https://jakevdp.github.io/PythonDataScienceHandbook/04.14-visualization-with-seaborn.html
@@ -47,9 +63,10 @@ def get_os_name(path):
 # https://docs.scipy.org/doc/scipy/reference/signal.html
 # Averaging: https://becominghuman.ai/introduction-to-timeseries-analysis-using-python-numpy-only-3a7c980231af
 class PostPlot:
-    def __init__(self, loader):
-        self.loader = loader
-        self.varlog = loader.getVarlogLoader()
+    def __init__(self, loaders, output_dir = None):
+        self.loaders = loaders
+        self.varlogs = [l.getVarlogLoader() for l in self.loaders]
+        self.output_dir = output_dir
         
         # KEY = "/explore/reward/train"
         # print("Keys=", self.varlog[KEY].keys())
@@ -74,52 +91,108 @@ class PostPlot:
             https://stackoverflow.com/a/12734723
 
         """
-        fig, ax = plt.subplots( nrows=1, ncols=1 )  # create figure & 1 axis
+        
+        sns.set_context("notebook", font_scale=2, rc={"lines.linewidth": 2.5})
+        # sns.set_context("paper")
+        # sns.set(font_scale=1.5)
 
-        KEY = "/explore/reward/"+mode
-        mean_loss_actor = self.varlog[KEY]["sum"] / self.varlog[KEY]["num"]
-        num = len(mean_loss_actor)
-        window_size = np.max([int(num/15),5])
-        mean_loss_actor_ma = moving_average(mean_loss_actor, window_size=window_size, mode='full')
-        epoch = self.varlog[KEY]["epoch"]
-        frame = self.varlog[KEY]["frame"] / 1e6
+        fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10, 8))  # create figure & 1 axis
+        
 
-        ax.plot(frame, mean_loss_actor, linewidth=1)
-        ax.plot(frame, mean_loss_actor_ma, linewidth=1.5)
+        
+        KEY = "/reward/"+mode+"/episodic"
+        mean_loss_actors = [var[KEY]["sum"]/var[KEY]["num"] for var in self.varlogs]
+        mean_loss_actors_ma = [get_signal_ma(signal, window_size=5) for signal in mean_loss_actors]
+
+        mean_loss_actors_ma_trimmed = trim_to_shortest(mean_loss_actors_ma)
+        
+        
+        episodes_all = [var[KEY]["episode"] for var in self.varlogs]
+        episodes_all_trimmed = trim_to_shortest(episodes_all)
+        episode = episodes_all_trimmed[0]
+        
+        epochs_all = [var[KEY]["epoch"] for var in self.varlogs]
+        epochs_all_trimmed = trim_to_shortest(epochs_all)
+        epoch = epochs_all_trimmed[0]
+
+        abscissa = episode
+
+        # frame = self.varlog[0][KEY]["frame"]
+        # TODO: Choose the shortest signal from all loaders.
+
+        # ax.plot(abscissa, mean_loss_actor, linewidth=1)
+        stack = mean_loss_actors_ma_trimmed
+
+        ax.plot(abscissa, np.mean(stack, axis=0), linewidth=1.5)
+        ax.fill_between(abscissa, np.max(stack, axis=0), np.min(stack, axis=0), alpha=0.2) # color='gray'
+
         ax.set_title(mode.capitalize()+" time return")
-        ax.set_ylabel("return (sum of rewards)")
-        ax.set_xlabel("million frames")
-        # ax.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
-        png_file = os.path.join(self.loader.getPlotsPath, get_os_name(KEY)+".png")
-        pdf_file = os.path.join(self.loader.getPlotsPath, get_os_name(KEY)+".pdf")
-        pkl_file = os.path.join(self.loader.getPlotsPath, get_os_name(KEY)+".pkl")
-        fig.savefig(png_file, bbox_inches='tight', dpi=300)
-        fig.savefig(pdf_file, bbox_inches='tight')
+        ax.set_ylabel("return (average of episodic rewards)")
+        ax.set_xlabel("episodes")
+
+        # Managing x axis limit
+        ax.set(xlim=(np.min(abscissa), np.max(abscissa)))
+        
+        # Managing x axis ticks
+        # Values
+        ax.set(xticks=np.linspace(start=np.min(abscissa),stop=np.max(abscissa),num=4, endpoint=True))
+        # Format
+        ## xlabels = ['{:,.2f}'.format(x) + 'M' for x in ax.get_xticks()/1e6]
+        ## ax.set_xticklabels(xlabels)
+
+        # plt.tight_layout(rect=[0, 0, 0.8, 1])
+        plt.tight_layout()
+
+        if self.output_dir:
+            path_to_output = self.output_dir
+        else:
+            path_to_output = self.loaders[0].getPlotsPath
+
+        png_file = os.path.join(path_to_output, get_os_name(KEY)+".png")
+        pdf_file = os.path.join(path_to_output, get_os_name(KEY)+".pdf")
+        pkl_file = os.path.join(path_to_output, get_os_name(KEY)+".pkl")
+        
+        
+        # fig.savefig(png_file, bbox_inches='tight', dpi=300)
+        # We do not use bbox_inches to make all figure sizes consistent.
+        fig.savefig(png_file, dpi=300)
+        # fig.savefig(pdf_file, bbox_inches='tight')
         pickle.dump(ax, open(pkl_file,'wb'))
         plt.close(fig)
     
 
 
 if __name__=="__main__":
-    parser = argparse.ArgumentParser()
-    
-    parser.add_argument('--session-dirs', metavar=('<path>'), default='/tmp/digideep_sessions', type=str, help="The root directory of sessions.")
-    parser.add_argument('--session-name', metavar=('<name>'), type=str, help="The name of the saved session.")
+    # import sys
+    # print(" ".join(sys.argv))
 
-    # parser.add_argument('--arg', metavar=('<pattern>'), nargs='?', const='', type=str, help="")
-    # parser.add_argument('--arg', metavar=('<n>'), default=X, type=int, help="")
-    # parser.add_argument('--arg', action="store_true", help="")
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-r', '--root-dir', metavar=('<path>'), default='/tmp/digideep_sessions', type=str, help="The root directory of sessions.")
+    parser.add_argument('-i', '--session-names', metavar=('<path>'), type=str, nargs='+', action='append', required=True, help="Path to all input sessions in the root path. `--session-names session_*_*`")
+    parser.add_argument('-o', '--output-dir', metavar=('<path>'), default='', type=str, help="Path to store the output plot.")
     args = parser.parse_args()
 
+    args.session_names = [os.path.relpath(t, args.root_dir) for y in args.session_names for x in y for t in glob.glob(os.path.join(args.root_dir, x))]
+    output_dir = os.path.join(args.root_dir, args.output_dir)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
     
     # Change the PYTHONPATH to load the saved modules for more compatibility.
-    sys.path.insert(0, args.session_dirs)
-    loader = get_class(args.session_name + "." + "loader")
-    pp = PostPlot(loader)
+    sys.path.insert(0, args.root_dir)
 
-    pp.plot_reward(mode="train")
-    pp.plot_reward(mode="test")
+    loaders = []
+    for s in args.session_names:
+        loaders += [get_class(s + "." + "loader")]
 
+    pp = PostPlot(loaders, output_dir)
 
-
+    try:
+        pp.plot_reward(mode="train")
+    except Exception as ex:
+        print(ex)
+    
+    try:
+        pp.plot_reward(mode="test")
+    except Exception as ex:
+        print(ex)
 
