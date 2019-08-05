@@ -180,6 +180,7 @@ def gen_params(cpanel):
     # Runner: [episode < cycle < epoch] #
     #####################################
     params["runner"] = {}
+    params["runner"]["name"] = cpanel.get("runner_name", "digideep.pipeline.Runner")
     params["runner"]["n_cycles"] = cpanel["epoch_size"]    # Meaning that 100 cycles are 1 epoch.
     params["runner"]["n_epochs"] = cpanel["number_epochs"] # Testing and savings are done after each epoch.
     params["runner"]["randargs"] = {'seed':cpanel["seed"], 'cuda_deterministic':cpanel["cuda_deterministic"]}
