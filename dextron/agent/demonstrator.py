@@ -62,8 +62,10 @@ class NaiveController(AgentBase):
         
         actions = []
         for index in range(num_workers):
+            # In order to save some milliseconds (!), we only generate actions when environment is in training mode (i.e. imitation learning).
             is_training = bool(observations["/status/is_training"][index].item())
             if is_training:
+                # Just ignore the burden if in "training" mode. We only generate demo for "teaching" mode.
                 actions += [np.zeros(shape=(self.action_size,))]
             else:
                 mask = masks[index]
@@ -93,10 +95,14 @@ class NaiveController(AgentBase):
                         cmd = _GRASPER_GAIN * (_CLOSE_HAND_CLOSURE - hand_closure)
 
                     # Storing action
-                    actions += [[cmd]]
+                    ## actions += [[cmd]]
+                    actions += [[cmd]*5]
                     # Increasing timestep
                     hidden_state["time_step"][index] += 1
 
+        # TODO: The actions generated in this demonstrator are not consistent! Sometimes their length is 1 sometimes 5.
+        #       The command series @line78 do not consiste with the rest.
+        # print("DEMO actions =", actions)
         actions = np.asarray(actions, dtype=np.float32)
         
         # Check if the action values are within the defined structure, then return.
