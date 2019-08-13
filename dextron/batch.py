@@ -2,7 +2,8 @@ import multiprocessing
 import subprocess
 import shlex
 from multiprocessing.pool import ThreadPool
-import os
+import os, re
+import argparse
 
 def call_proc(cmd):
     """ This runs in a separate thread. """
@@ -12,7 +13,7 @@ def call_proc(cmd):
 
 class JobPool:
     def __init__(self, command_list, nproc=None):
-        self.nproc = nproc or (multiprocessing.cpu_count()-1)
+        self.nproc = nproc or max(multiprocessing.cpu_count()-2, 1)
         self.pool = ThreadPool(self.nproc)
         self.command_list = command_list
         self.results = []
@@ -55,80 +56,115 @@ class JobPool:
         return self
 
 
-session_path = "/tmp/digideep_sessions"
-reports_path = "/reports"
-session_name_list = []
-session_name_pattern_list = []
-output_dir_list = []
-###########################
-##### Run Simulations #####
-###########################
-command_list = []
-mode = "replay"
 
-mode_path = os.path.join(reports_path, mode)
-if not os.path.exists(mode_path):
-    os.makedirs(mode_path)
-else:
-    print("Directory '{}' already existed.".format(mode_path))
+if __name__=="__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--session-path', metavar=('<path>'), type=str, default="/scratch/sharif.mo/digideep_slurm/sessions/other", help="Path to session storage.")
+    parser.add_argument('--reports-path', metavar=('<path>'), type=str, default="/scratch/sharif.mo/digideep_slurm/reports", help="Path to reports storage.")
+    parser.add_argument('--resume', action='store_true', help="Whether to resume already processed data or to remove the existing sessions_path and reports.")
+    args = parser.parse_args()
 
-for i in range(1):
-    replay_use_ratio = (i+1) * 0.1
-    replay_use_ratio_str = "{:2.1f}".format(replay_use_ratio).replace(".", "_")
-    session_name = "session_{mode}_{replay_use_ratio_str}_{{seed}}".format(mode=mode, replay_use_ratio_str=replay_use_ratio_str)
-    session_name_pattern_list += [session_name.format(seed="s*")]
-    output_dir_list += [session_name.format(seed="ALL")]
+    session_path = args.session_path
+    reports_path = args.reports_path
 
-    for seed in [100, 110, 120]:
-        session_name = session_name.format(seed="s"+str(seed))
-        command = """python -m digideep.main \
-                            --save-modules "dextron" \
-                            --session-name "{session_name:s}" \
-                            --params dextron.params.sac \
-                            --cpanel '{{"time_limit":6, \
-                                        "seed":{seed:d}, \
-                                        "replay_use_ratio":{replay_use_ratio:2.1f}, \
-                                        "epoch_size":{epoch_size:d}, \
-                                        "number_epochs":{number_epochs:d}\
-                                    }}' \
-                """.format(session_name=session_name,
-                           seed=seed,
-                           replay_use_ratio=replay_use_ratio,
-                           epoch_size=400,
-                           number_epochs=1000)
-        session_name_list += [session_name]
-        command_list += [command]
+
+    if args.resume:
+        # Get existing "done" jobs.
+        # Remove incomplete jobs.
+        pass
+    else:
+        # Complain if the directories already exist.
+        # Ask user to remove the directories then continue.
+        # This helps increase safety.
+        if os.path.exists(session_path):
+            raise Exception("The 'session_path' already exists at '{}'. To continue remove it or use '--resume' option.".format(session_path))
+        ## Existing "reports_path" is not as severe.
+        # if os.path.exists(reports_path):
+        #     raise Exception("The 'reports_path' already exists at '{}'. To continue remove it or use '--resume' option.".format(reports_path))
+
+
+    session_name_list = []
+    session_name_pattern_list = []
+    output_dir_list = []
+    ###########################
+    ##### Run Simulations #####
+    ###########################
+    command_list = []
+    mode = "nstep"
+
+    for j in range(1):
+        replay_nsteps = j + 1
+        for i in range(1):
+            replay_use_ratio = (i+1) * 0.1
+            replay_use_ratio_str = "{:2.1f}".format(replay_use_ratio).replace(".", "_")
+            session_name_seed = "session_{mode}_{replay_use_ratio_str}_n{replay_nsteps}_{{seed}}".format(mode=mode, replay_use_ratio_str=replay_use_ratio_str, replay_nsteps=replay_nsteps)
+            session_name_pattern_list += [session_name_seed.format(seed="s*")]
+            output_dir_list += [session_name_seed.format(seed="ALL")]
+
+            for seed in [0]:
+                session_name = session_name_seed.format(seed="s"+str(seed))
+                command = """python -m digideep.main \
+                                    --save-modules "dextron" \
+                                    --session-path "{session_path:s}" \
+                                    --session-name "{session_name:s}" \
+                                    --params dextron.params.sac \
+                                    --cpanel '{{"time_limit":6, \
+                                                "seed":{seed:d}, \
+                                                "replay_use_ratio":{replay_use_ratio:2.1f}, \
+                                                "replay_nsteps":{replay_nsteps:d}, \
+                                                "epoch_size":{epoch_size:d}, \
+                                                "number_epochs":{number_epochs:d}\
+                                            }}' \
+                        """.format(session_path=session_path,
+                                session_name=session_name,
+                                seed=seed,
+                                replay_use_ratio=replay_use_ratio,
+                                replay_nsteps=replay_nsteps,
+                                epoch_size=400,
+                                number_epochs=1000)
+                session_name_list += [session_name]
+                command_list += [command]
+                
+                print(re.sub("\s\s+" , " ", command))
+
+    print("HERE "*5)
+    JobPool(command_list, nproc=None).run().print_err()
     
-# JobPool(command_list).run().print_err()
+    ###############################
+    ##### Run Post-processing #####
+    ###############################
+    command_list = []
+    for session_name, output_dir in zip(session_name_pattern_list, output_dir_list):
+        command = """python -m dextron.post --session-names {} --output-dir {}""".format(session_name, output_dir)
+        command_list += [command]
 
-###############################
-##### Run Post-processing #####
-###############################
-command_list = []
-for session_name, output_dir in zip(session_name_pattern_list, output_dir_list):
-    command = """python -m dextron.post --session-names {} --output-dir {}""".format(session_name, output_dir)
-    command_list += [command]
+    JobPool(command_list, nproc=None).run().print_all()
 
-JobPool(command_list).run().print_all()
+    # #################################
+    # ##### Generate plot reports #####
+    # #################################
+    # #### Copy all of the png files into the parent folder.
+    # import ffmpeg # See: https://github.com/kkroening/ffmpeg-python
 
-# #################################
-# ##### Generate plot reports #####
-# #################################
-# #### Copy all of the png files into the parent folder.
-# import ffmpeg # See: https://github.com/kkroening/ffmpeg-python
 
-# for result_mode in ["test", "train"]:
-#     output_path = os.path.join(reports_path, mode, "{}_mosaic.png".format(result_mode))
-#     plot_name = "explore_reward_{}.png".format(result_mode)
-#     # explore_reward_train.png | explore_reward_test.png 
-#     inputs = []
-#     for session_name in session_name_list:
-#         path_to_plot = os.path.join(session_path, session_name, "plots", plot_name)
-#         inputs += [ffmpeg.input(path_to_plot)]
-#     top    = ffmpeg.filter(inputs[0:3], "hstack", inputs="3")
-#     middle = ffmpeg.filter(inputs[3:6], "hstack", inputs="3")
-#     bottom = ffmpeg.filter(inputs[6:9], "hstack", inputs="3")
-#     ffmpeg.filter([top, middle, bottom], "vstack", inputs="3").output(output_path).run(overwrite_output=True)
+    # mode_path = os.path.join(reports_path, mode)
+    if not os.path.exists(reports_path): # And it shouldn't exist indeed.
+        os.makedirs(reports_path)
+    else:
+        print("'reports_path' already exists at '{}'".format(reports_path))
+
+    # for result_mode in ["test", "train"]:
+    #     output_path = os.path.join(reports_path, "{}_mosaic.png".format(result_mode))
+    #     plot_name = "explore_reward_{}.png".format(result_mode)
+    #     # explore_reward_train.png | explore_reward_test.png 
+    #     inputs = []
+    #     for session_name in session_name_list:
+    #         path_to_plot = os.path.join(session_path, session_name, "plots", plot_name)
+    #         inputs += [ffmpeg.input(path_to_plot)]
+    #     top    = ffmpeg.filter(inputs[0:3], "hstack", inputs="3")
+    #     middle = ffmpeg.filter(inputs[3:6], "hstack", inputs="3")
+    #     bottom = ffmpeg.filter(inputs[6:9], "hstack", inputs="3")
+    #     ffmpeg.filter([top, middle, bottom], "vstack", inputs="3").output(output_path).run(overwrite_output=True)
 
 
 
