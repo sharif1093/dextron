@@ -2,11 +2,12 @@ import multiprocessing
 import subprocess
 import shlex
 from multiprocessing.pool import ThreadPool
-import os, re
+import os, re, glob, shutil
 import argparse
 
 def call_proc(cmd):
     """ This runs in a separate thread. """
+    print("cmd>", cmd)
     p = subprocess.Popen(shlex.split(cmd, posix=True), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = p.communicate()
     return (out, err)
@@ -29,7 +30,7 @@ class JobPool:
     def print_out(self):
         for result, command in zip(self.results, self.command_list):
             out, _ = result.get()
-            print("#", command)
+            print("cmd>", command)
             print("."*85)
             print(out.decode("utf-8"))
             print("\n"+"="*85+"\n")
@@ -38,7 +39,7 @@ class JobPool:
     def print_err(self):
         for result, command in zip(self.results, self.command_list):
             _, err = result.get()
-            print("#", command)
+            print("cmd>", command)
             print("."*85)
             print(err.decode("utf-8"))
             print("\n"+"="*85+"\n")
@@ -47,13 +48,25 @@ class JobPool:
     def print_all(self):
         for result, command in zip(self.results, self.command_list):
             out, err = result.get()
-            print("#", command)
+            print("cmd>", command)
             print("."*85)
             print(out.decode("utf-8"))
             print("."*85)
             print(err.decode("utf-8"))
             print("\n"+"="*85+"\n")
         return self
+
+def clean_spaces(command):
+    return re.sub("\s\s+" , " ", command)
+
+def lsdir(root):
+    return [x for x in os.listdir(session_path) if os.path.isdir(os.path.join(session_path,x))]
+
+def rmdir(path):
+    os.system('rm -rf {}'.format(path))
+
+def check_done(root, name):
+    return os.path.exists(os.path.join(root, name, 'done.lock'))
 
 
 
@@ -69,10 +82,20 @@ if __name__=="__main__":
 
 
     if args.resume:
-        # Get existing "done" jobs.
-        # Remove incomplete jobs.
-        pass
+        # Get all directories in the session_path
+        # Check if "done.lock" is inside.
+        # If "YES", don't do that job again.
+        # If "NO", remove that job and ket that to be done again.
+
+        existing = set(lsdir(session_path))
+        donelist = {x for x in existing if check_done(session_path, x)}
+        incomplete = existing - donelist
+        # Remove incomplete items:
+        for x in incomplete:
+            rmdir(os.path.join(session_path, x))
+        print("Complete sessions:", donelist)
     else:
+        donelist = {}
         # Complain if the directories already exist.
         # Ask user to remove the directories then continue.
         # This helps increase safety.
@@ -90,18 +113,18 @@ if __name__=="__main__":
     ##### Run Simulations #####
     ###########################
     command_list = []
-    mode = "nstep"
 
-    for j in range(1):
+    # Different replay steps
+    for j in range(5):
         replay_nsteps = j + 1
-        for i in range(1):
+        for i in range(10):
             replay_use_ratio = (i+1) * 0.1
             replay_use_ratio_str = "{:2.1f}".format(replay_use_ratio).replace(".", "_")
-            session_name_seed = "session_{mode}_{replay_use_ratio_str}_n{replay_nsteps}_{{seed}}".format(mode=mode, replay_use_ratio_str=replay_use_ratio_str, replay_nsteps=replay_nsteps)
+            session_name_seed = "session_{replay_use_ratio_str}_n{replay_nsteps}_{{seed}}".format(replay_use_ratio_str=replay_use_ratio_str, replay_nsteps=replay_nsteps)
             session_name_pattern_list += [session_name_seed.format(seed="s*")]
             output_dir_list += [session_name_seed.format(seed="ALL")]
 
-            for seed in [0]:
+            for seed in [100, 110, 120]:
                 session_name = session_name_seed.format(seed="s"+str(seed))
                 command = """python -m digideep.main \
                                     --save-modules "dextron" \
@@ -122,12 +145,14 @@ if __name__=="__main__":
                                 replay_nsteps=replay_nsteps,
                                 epoch_size=400,
                                 number_epochs=1000)
-                session_name_list += [session_name]
-                command_list += [command]
                 
-                print(re.sub("\s\s+" , " ", command))
+                command = clean_spaces(command)
+                session_name_list += [session_name]
+                if not session_name in donelist:
+                    command_list += [command]
+                # print(command)
 
-    print("HERE "*5)
+    print("Executing simulations.")
     JobPool(command_list, nproc=None).run().print_err()
     
     ###############################
@@ -136,6 +161,7 @@ if __name__=="__main__":
     command_list = []
     for session_name, output_dir in zip(session_name_pattern_list, output_dir_list):
         command = """python -m dextron.post --session-names {} --output-dir {}""".format(session_name, output_dir)
+        command = clean_spaces(command)
         command_list += [command]
 
     JobPool(command_list, nproc=None).run().print_all()
@@ -147,7 +173,6 @@ if __name__=="__main__":
     # import ffmpeg # See: https://github.com/kkroening/ffmpeg-python
 
 
-    # mode_path = os.path.join(reports_path, mode)
     if not os.path.exists(reports_path): # And it shouldn't exist indeed.
         os.makedirs(reports_path)
     else:
