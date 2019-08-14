@@ -72,8 +72,10 @@ def check_done(root, name):
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--session-path', metavar=('<path>'), type=str, default="/scratch/sharif.mo/digideep_slurm/sessions/other", help="Path to session storage.")
-    parser.add_argument('--reports-path', metavar=('<path>'), type=str, default="/scratch/sharif.mo/digideep_slurm/reports", help="Path to reports storage.")
+    parser.add_argument('--session-path', metavar=('<path>'), type=str, default="/tmp/digideep_sessions", help="Path to session storage.")
+    parser.add_argument('--reports-path', metavar=('<path>'), type=str, default="/reports", help="Path to reports storage.")
+    # parser.add_argument('--session-path', metavar=('<path>'), type=str, default="/scratch/sharif.mo/digideep_slurm/sessions/other", help="Path to session storage.")
+    # parser.add_argument('--reports-path', metavar=('<path>'), type=str, default="/scratch/sharif.mo/digideep_slurm/reports", help="Path to reports storage.")
     parser.add_argument('--resume', action='store_true', help="Whether to resume already processed data or to remove the existing sessions_path and reports.")
     args = parser.parse_args()
 
