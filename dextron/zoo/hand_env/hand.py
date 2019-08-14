@@ -21,7 +21,7 @@ import sys
 
 from dm_control import mujoco
 from dm_control.rl import control
-from dm_control.rl import specs
+from dm_env import specs
 from dm_control.suite import base
 from dm_control.suite.utils import randomizers
 from dm_control.utils import rewards
@@ -38,7 +38,8 @@ from .grasp_controllers import GraspControllerIndividualVelocity
 ## Model Constants and Tasks ##
 ###############################
 _MODEL_NAME = "bb_left_hand"
-_GRASP_CONTROLLER = GraspControllerIndividualVelocity
+_GRASP_CONTROLLER_AGENT = GraspControllerIndividualVelocity
+_GRASP_CONTROLLER_TEACHER = GraspControllerAllVelocity
 # _NUM_ACTION = 2
 
 # We want to delay actual running of this function until the last moment.
@@ -167,16 +168,26 @@ class Hand(base.Task):
                 integer seed for creating a new `RandomState`, or None to select a seed
                 automatically (default).
         """
-        # print("Passed task parameters:", params)
+        # NOTE: We access to the "extra_env_kwargs" params not to the whole "explorer" params.
         self.params = params
-        explorer_mode = self.params.get("mode", "train")
-        # Here we first try to ping "allow_demos". If it is absent we see if mode is "train". Then we allow training otherwise no.
-        self.teaching_allowed = self.params.get("allow_demos", (explorer_mode=="train"))
         
-        self.teaching_rate = self.params.get("teaching_rate", 0.5)
-        print("Teaching Rate:", self.teaching_rate)
+        # Here we first try to ping "allow_demos". If it is absent we see if mode is "train". Then we allow training otherwise no.
+        self.allow_demos = self.params.get("allow_demos", False)
 
-        self.mode = None # "training" | "teaching"
+        # All possible modes: train, test, eval, demo, replay
+        self.explorer_mode = self.params.get("mode", "train")
+        # if self.explorer_mode == "demo":
+        #     self.mode = "teaching"
+        # elif self.explorer_mode in ["train", "replay", "test", "eval"]:
+        #     self.mode = "training"
+        
+        self.mode = None
+        
+
+        # self.teaching_rate = self.params.get("teaching_rate", 0.5)
+        # print("Teaching Rate:", self.teaching_rate)
+        # self.mode = None # "training" | "teaching"
+        
         super(Hand, self).__init__(random=self.params.get("random", None))
 
     def initialize_episode(self, physics):
@@ -188,21 +199,33 @@ class Hand(base.Task):
         4. Assign the mocap quat: physics.named.data.mocap_quat["mocap"]
         """
 
-        self.grasper = _GRASP_CONTROLLER(physics)
-        
-        # # Overriding the teaching mode
-        # self.mode = "teaching"
-        # print("--------- TEACHING MODE ---------")
-
-        random_mode_selection = np.random.rand()
-        # For 20% of all times, start with a teacher mode.
-        if (random_mode_selection < self.teaching_rate) and (self.teaching_allowed):
+        if self.allow_demos:
             self.mode = "teaching"
-            print("--------- TEACHING MODE ---------")
+            print(">>>> ATTENTION! We are using teaching mode in explorer [{}]. <<<<".format(self.explorer_mode))
         else:
             self.mode = "training"
-            print("+++++++++ TRAINING MODE +++++++++")
-        # print("Distance to hand is = ", physics.get_distance_in_xy_plane())
+
+
+        # self.grasper = {}
+        # self.grasper["training"] = _GRASP_CONTROLLER_AGENT(physics)
+        # self.grasper["teaching"] = _GRASP_CONTROLLER_TEACHER(physics)
+
+        self.grasper = {}
+        self.grasper["training"] = _GRASP_CONTROLLER_AGENT(physics)
+        self.grasper["teaching"] = _GRASP_CONTROLLER_AGENT(physics)
+        
+
+        # random_mode_selection = np.random.rand()
+        # # For 20% of all times, start with a teacher mode.
+        # if (random_mode_selection < self.teaching_rate) and (self.teaching_allowed):
+        #     self.mode = "teaching"
+        #     print("--------- TEACHING MODE ---------")
+        # else:
+        #     self.mode = "training"
+        #     print("+++++++++ TRAINING MODE +++++++++")
+        # # print("Distance to hand is = ", physics.get_distance_in_xy_plane())
+
+
 
         #########################################
         ### Randomizations of the environment ###
@@ -294,8 +317,11 @@ class Hand(base.Task):
         # spec["demonstrator"] = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
         ## 5) Velocity control (continuous) on individual fingers
         # TODO: Different action shapes MUST produce an error!
-        spec["agent"]        = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
-        spec["demonstrator"] = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
+        ## spec["agent"]        = specs.BoundedArraySpec(shape=(5,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
+        ## spec["demonstrator"] = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
+
+        spec["agent"]        = specs.BoundedArray(shape=(5,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
+        spec["demonstrator"] = specs.BoundedArray(shape=(5,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
 
         
         # physics.model.nmocap
@@ -325,9 +351,9 @@ class Hand(base.Task):
         # on the actuators to set their values:
         
         if self.mode == "training":
-            ctrl_actions = self.grasper(action["agent"], physics)
+            ctrl_actions = self.grasper["training"](action["agent"], physics)
         elif self.mode == "teaching":
-            ctrl_actions = self.grasper(action["demonstrator"], physics)
+            ctrl_actions = self.grasper["teaching"](action["demonstrator"], physics)
         
         # 3) Send lowest-level actions for execution in the simulator.
         super(Hand, self).before_step(ctrl_actions, physics)
