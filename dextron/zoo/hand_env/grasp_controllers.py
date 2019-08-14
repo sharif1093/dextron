@@ -210,9 +210,12 @@ class GraspControllerIndividualVelocity(GraspControllerBase):
         # 1: Fully closed
         # 0: Fully open
         
+        assert len(action) == 5, "The action length must be 5 for individual finger control. For parameterized grasping use GraspControllerAllVelocity."
+
         # TODO: We override the action momentarilly:
         # action = np.array([1,1,1,1,1])
-        action = np.array([action,action,action,action,action])
+        # action = np.array([action,action,action,action,action])
+        action = np.array(action)
 
         # "A_thumb_C" remains unchanged.
 
