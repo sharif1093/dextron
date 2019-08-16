@@ -1,9 +1,13 @@
-import multiprocessing
-import subprocess
 import shlex
+import subprocess
+import multiprocessing
 from multiprocessing.pool import ThreadPool
-import os, re, glob, shutil
-import argparse
+
+import os, re, glob, shutil, argparse
+
+from digideep.utility.stats import StatLogger
+from digideep.pipeline.session import generateTimestamp
+
 
 def call_proc(cmd):
     """ This runs in a separate thread. """
@@ -74,6 +78,8 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--session-path', metavar=('<path>'), type=str, default="/tmp/digideep_sessions", help="Path to session storage.")
     parser.add_argument('--reports-path', metavar=('<path>'), type=str, default="/reports", help="Path to reports storage.")
+    parser.add_argument('--logs-path', metavar=('<path>'), type=str, default="/tmp", help="Path to log files.")
+    parser.add_argument('--instance', metavar=('<str>'), type=str, default="default", help="Name of running instance.")
     # parser.add_argument('--session-path', metavar=('<path>'), type=str, default="/scratch/sharif.mo/digideep_slurm/sessions/other", help="Path to session storage.")
     # parser.add_argument('--reports-path', metavar=('<path>'), type=str, default="/scratch/sharif.mo/digideep_slurm/reports", help="Path to reports storage.")
     parser.add_argument('--resume', action='store_true', help="Whether to resume already processed data or to remove the existing sessions_path and reports.")
@@ -81,6 +87,8 @@ if __name__=="__main__":
 
     session_path = args.session_path
     reports_path = args.reports_path
+    logs_path = args.logs_path
+    instance = args.instance
 
     # print(os.environ)
 
@@ -108,6 +116,8 @@ if __name__=="__main__":
         # if os.path.exists(reports_path):
         #     raise Exception("The 'reports_path' already exists at '{}'. To continue remove it or use '--resume' option.".format(reports_path))
 
+    st = StatLogger(monitor_cpu=True, monitor_gpu=True, output=os.path.join(logs_path, "stats_"+instance+"_"+generateTimestamp()+".log"), interval=2.0)
+    st.start()
 
     session_name_list = []
     session_name_pattern_list = []
