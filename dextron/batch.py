@@ -7,7 +7,7 @@ import argparse
 
 def call_proc(cmd):
     """ This runs in a separate thread. """
-    print("cmd>", cmd)
+    # print("cmd>", cmd)
     p = subprocess.Popen(shlex.split(cmd, posix=True), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = p.communicate()
     return (out, err)
@@ -82,8 +82,9 @@ if __name__=="__main__":
     session_path = args.session_path
     reports_path = args.reports_path
 
+    # print(os.environ)
 
-    if args.resume:
+    if args.resume and os.path.exists(session_path):
         # Get all directories in the session_path
         # Check if "done.lock" is inside.
         # If "YES", don't do that job again.
@@ -117,7 +118,7 @@ if __name__=="__main__":
     command_list = []
 
     # Different replay steps
-    for j in range(5):
+    for j in range(10):
         replay_nsteps = j + 1
         for i in range(10):
             replay_use_ratio = (i+1) * 0.1
@@ -128,7 +129,7 @@ if __name__=="__main__":
 
             for seed in [100, 110, 120]:
                 session_name = session_name_seed.format(seed="s"+str(seed))
-                command = """python -m digideep.main \
+                command = """python -u -m digideep.main \
                                     --save-modules "dextron" \
                                     --session-path "{session_path:s}" \
                                     --session-name "{session_name:s}" \
@@ -155,7 +156,8 @@ if __name__=="__main__":
                 # print(command)
 
     print("Executing simulations.")
-    JobPool(command_list, nproc=None).run().print_err()
+    # JobPool(command_list, nproc=22).run().print_err().print_out()
+    JobPool(command_list, nproc=16).run().print_all()
     
     ###############################
     ##### Run Post-processing #####
