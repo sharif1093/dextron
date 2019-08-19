@@ -8,6 +8,7 @@ import os, re, glob, shutil, argparse
 from digideep.utility.stats import StatLogger
 from digideep.pipeline.session import generateTimestamp
 
+from tqdm import tqdm
 
 def call_proc(cmd):
     """ This runs in a separate thread. """
@@ -24,8 +25,16 @@ class JobPool:
         self.results = []
 
     def run(self):
-        for command in self.command_list:
-            self.results.append(self.pool.apply_async(call_proc, (command,)))
+        pbar = tqdm(total=len(self.command_list))
+        def update(*a):
+            pbar.update()
+        # tqdm.write(str(a))
+        for i in range(pbar.total):
+            command = self.command_list[i]
+            self.pool.apply_async(call_proc, args=(command,), callback=update)
+
+        # for command in self.command_list:
+        #     self.results.append(self.pool.apply_async(call_proc, (command,)))
         # Close the pool and wait for each running task to complete
         self.pool.close()
         self.pool.join()
@@ -78,7 +87,7 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--session-path', metavar=('<path>'), type=str, default="/tmp/digideep_sessions", help="Path to session storage.")
     parser.add_argument('--reports-path', metavar=('<path>'), type=str, default="/reports", help="Path to reports storage.")
-    parser.add_argument('--logs-path', metavar=('<path>'), type=str, default="/tmp", help="Path to log files.")
+    parser.add_argument('--logs-path', metavar=('<path>'), type=str, default="/logs", help="Path to log files.")
     parser.add_argument('--instance', metavar=('<str>'), type=str, default="default", help="Name of running instance.")
     # parser.add_argument('--session-path', metavar=('<path>'), type=str, default="/scratch/sharif.mo/digideep_slurm/sessions/other", help="Path to session storage.")
     # parser.add_argument('--reports-path', metavar=('<path>'), type=str, default="/scratch/sharif.mo/digideep_slurm/reports", help="Path to reports storage.")
@@ -128,9 +137,9 @@ if __name__=="__main__":
     command_list = []
 
     # Different replay steps
-    for j in range(10):
+    for j in [1, 3, 5, 7, 9]:
         replay_nsteps = j + 1
-        for i in range(10):
+        for i in [0, 2, 4, 6, 8]:
             replay_use_ratio = (i+1) * 0.1
             replay_use_ratio_str = "{:2.1f}".format(replay_use_ratio).replace(".", "_")
             session_name_seed = "session_{replay_use_ratio_str}_n{replay_nsteps}_{{seed}}".format(replay_use_ratio_str=replay_use_ratio_str, replay_nsteps=replay_nsteps)
@@ -167,7 +176,7 @@ if __name__=="__main__":
 
     print("Executing simulations.")
     # JobPool(command_list, nproc=22).run().print_err().print_out()
-    JobPool(command_list, nproc=16).run().print_all()
+    JobPool(command_list, nproc=None).run().print_all()
     
     ###############################
     ##### Run Post-processing #####
