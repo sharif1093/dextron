@@ -2,8 +2,8 @@ import numpy as np
 import warnings
 from copy import deepcopy
 
-from digideep.agent.samplers.common import get_memory_params # , Compose
-from digideep.agent.samplers.ddpg import get_sample_memory
+from digideep.agent.sampler_common import get_memory_params # , Compose
+from digideep.agent.ddpg.sampler import get_sample_memory
 from digideep.utility.profiling import KeepTime
 
 

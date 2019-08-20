@@ -7,7 +7,7 @@ from digideep.utility.logging import logger
 from digideep.utility.profiling import KeepTime
 from digideep.utility.monitoring import monitor
 
-from digideep.agent.base import AgentBase
+from digideep.agent.agent_base import AgentBase
 
 
 _DISTANCE_CRITICAL = 0.15
