@@ -36,6 +36,7 @@ cpanel["epoch_size"]    = 400  # cycles
 cpanel["number_epochs"] = 1000
 cpanel["test_activate"] = True  # Test Activate
 cpanel["test_interval"] = 10    # Test Interval Every #n Epochs
+cpanel["test_win_size"] = 5     # Number of episodes to run test.
 cpanel["save_interval"] = 10    # Save Interval Every #n Epochs
 
 cpanel["seed"] = 0
@@ -74,8 +75,9 @@ cpanel["gamma"] = 0.99     # The gamma parameter used in VecNormalize | Agent.pr
 cpanel["num_workers"] = 1  # From Explorer           # Number of exploratory workers working together
 cpanel["n_steps"] = 1      # From Explorer           # Number of frames to produce
 ### Exploitation (~ n_update * batch_size)
-cpanel["n_update"] = 1     # From Agents
+cpanel["n_update"] = 1     # From Agents: Updates per step
 cpanel["batch_size"] = 128 # From Agents
+cpanel["warm_start"] = 10000
 cpanel["replay_use_ratio"] = 0.7 #  %rur of training data comes from the "replay", where (100-%rur) comes from the "train"
 cpanel["replay_nsteps"] = 1
 
@@ -89,6 +91,7 @@ cpanel["lr_actor"] = 3e-4
 # cpanel["eps"] = 1e-5 # Epsilon parameter used in the optimizer(s) (ADAM/RMSProp/...)
 
 cpanel["polyak_factor"] = 0.01
+cpanel["target_update_interval"] = 1
 
 # cpanel["noise_std"] = 0.2
 
@@ -129,10 +132,13 @@ def gen_params(cpanel):
     ### Normal Wrappers ###
     #######################
     norm_wrappers = []
+
+    # Converting observation to 1 level
     norm_wrappers.append(dict(name="digideep.environment.wrappers.normal.WrapperLevelDictObs",
                               args={"path":cpanel["observation_key"],
                               },
                               enabled=True))
+    # Normalizing actions (to be in [-1, 1])
     norm_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.WrapperNormalizeActDict",
                               args={"paths":["agent"]},
                               enabled=False))
@@ -142,12 +148,14 @@ def gen_params(cpanel):
     #######################
     vect_wrappers = []
 
+    # Normalizing observations
     vect_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.VecNormalizeObsDict",
                               args={"paths":[cpanel["observation_key"]],
                                     "clip":5, # 10
                                     "epsilon":1e-8
                               },
                               enabled=True))
+    # Normalizing rewards
     vect_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.VecNormalizeRew",
                               args={"clip":5, # 10
                                     "gamma":cpanel["gamma"],
@@ -312,11 +320,13 @@ def gen_params(cpanel):
     params["explorer"]["train"]["env"] = params["env"]
     params["explorer"]["train"]["do_reset"] = False
     params["explorer"]["train"]["final_action"] = False
+    params["explorer"]["train"]["warm_start"] = cpanel["warm_start"] # In less than "warm_start" steps the agent will take random actions. 
     params["explorer"]["train"]["num_workers"] = cpanel["num_workers"]
     params["explorer"]["train"]["deterministic"] = False # MUST: Takes random actions
     params["explorer"]["train"]["n_steps"] = cpanel["n_steps"] # Number of steps to take a step in the environment
+    params["explorer"]["train"]["n_episodes"] = None # Do not limit # of episodes
     params["explorer"]["train"]["win_size"] = 10 # Number of episodes to episode reward for report
-    params["explorer"]["train"]["render"] = False # False
+    params["explorer"]["train"]["render"] = False
     params["explorer"]["train"]["render_delay"] = 0
     params["explorer"]["train"]["seed"] = cpanel["seed"] + 90
     params["explorer"]["train"]["extra_env_kwargs"] = {"mode":params["explorer"]["train"]["mode"], "allow_demos":False}
@@ -326,10 +336,12 @@ def gen_params(cpanel):
     params["explorer"]["test"]["env"] = params["env"]
     params["explorer"]["test"]["do_reset"] = True
     params["explorer"]["test"]["final_action"] = False
+    params["explorer"]["test"]["warm_start"] = 0
     params["explorer"]["test"]["num_workers"] = cpanel["num_workers"] # We can use the same amount of workers for testing!
     params["explorer"]["test"]["deterministic"] = True   # MUST: Takes the best action
-    params["explorer"]["test"]["n_steps"] = params["env"]["config"]["max_episode_steps"] # Execute a full episode until the maximum allowed steps.
-    params["explorer"]["test"]["win_size"] = 2
+    params["explorer"]["test"]["n_steps"] = None # Do not limit # of steps
+    params["explorer"]["test"]["n_episodes"] = cpanel["test_win_size"]
+    params["explorer"]["test"]["win_size"] = cpanel["test_win_size"] # Extra episodes won't be counted
     params["explorer"]["test"]["render"] = False
     params["explorer"]["test"]["render_delay"] = 0
     params["explorer"]["test"]["seed"] = cpanel["seed"] + 100 # We want to make the seed of test environments different from training.
@@ -340,9 +352,11 @@ def gen_params(cpanel):
     params["explorer"]["eval"]["env"] = params["env"]
     params["explorer"]["eval"]["do_reset"] = False
     params["explorer"]["eval"]["final_action"] = False
+    params["explorer"]["eval"]["warm_start"] = 0
     params["explorer"]["eval"]["num_workers"] = 1
     params["explorer"]["eval"]["deterministic"] = True   # MUST: Takes the best action
-    params["explorer"]["eval"]["n_steps"] = params["env"]["config"]["max_episode_steps"] # Execute a full episode until the maximum allowed steps.
+    params["explorer"]["eval"]["n_steps"] = None # Do not limit # of steps
+    params["explorer"]["eval"]["n_episodes"] = 1
     params["explorer"]["eval"]["win_size"] = -1
     params["explorer"]["eval"]["render"] = True
     params["explorer"]["eval"]["render_delay"] = 0
@@ -355,9 +369,11 @@ def gen_params(cpanel):
     params["explorer"]["demo"]["env"] = params["env"]
     params["explorer"]["demo"]["do_reset"] = False
     params["explorer"]["demo"]["final_action"] = False
+    params["explorer"]["demo"]["warm_start"] = 0
     params["explorer"]["demo"]["num_workers"] = cpanel["num_workers"]
     params["explorer"]["demo"]["deterministic"] = False # MUST: Takes random actions
     params["explorer"]["demo"]["n_steps"] = cpanel["n_steps"] # Number of steps to take a step in the environment
+    params["explorer"]["demo"]["n_episodes"] = None
     params["explorer"]["demo"]["win_size"] = -1
     params["explorer"]["demo"]["render"] = False # False
     params["explorer"]["demo"]["render_delay"] = 0
@@ -370,9 +386,11 @@ def gen_params(cpanel):
     params["explorer"]["replay"]["env"] = params["env"]
     params["explorer"]["replay"]["do_reset"] = False
     params["explorer"]["replay"]["final_action"] = False
+    params["explorer"]["replay"]["warm_start"] = 0
     params["explorer"]["replay"]["num_workers"] = cpanel["num_workers"]
     params["explorer"]["replay"]["deterministic"] = False # MUST: Takes random actions
     params["explorer"]["replay"]["n_steps"] = cpanel["replay_nsteps"] # Number of steps to take a step in the environment
+    params["explorer"]["replay"]["n_episodes"] = None
     params["explorer"]["replay"]["win_size"] = 10
     params["explorer"]["replay"]["render"] = False # False
     params["explorer"]["replay"]["render_delay"] = 0
