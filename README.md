@@ -25,6 +25,9 @@ python -m digideep.main --save-modules "dextron" --params dextron.params.sac --c
 ## Eval mode, With session, With loading: Loading from a checkpoint
 python -m digideep.main --play --load-checkpoint "<path-to-checkpoint>"
 
+## Doing post-processing for all sessions in a directory. Note: the session names should follow the pattern of "<NAME>_s<seed>" to be included.
+python -m dextron.post_all --root-dir "/tmp/digideep_sessions_old/ins_noisy_end"
+
 # Loading a saved checkpoint using its saved modules
 PYTHONPATH="<path-to-session>/modules" python -m digideep.main --play --load-checkpoint "<path-to-checkpoint>"
 
