@@ -3,21 +3,23 @@ import os, socket
 # import torch
 # import torch.distributed as dist
 # see: https://mpi4py.readthedocs.io/en/stable/tutorial.html
-from mpi4py import MPI
-dist = MPI.COMM_WORLD
+
+try:
+    from mpi4py import MPI
+    dist = MPI.COMM_WORLD
+except:
+    dist = None
 
 import os, re, glob, shutil, argparse
 
 from digideep.utility.stats import StatLogger
 from digideep.pipeline.session import generateTimestamp
 
-
-
 class DistributedJobPool:
     def __init__(self, backend="gloo"):
         self.master_addr = os.environ.get('MASTER_ADDR', None)
         self.master_port = os.environ.get('MASTER_PORT', None)
-        self.world_size  = int(os.environ.get('WORLD_SIZE', None))
+        self.world_size  = int(os.environ.get('WORLD_SIZE', 1))
         self.rank = int(os.environ.get('RANK', 0))
         self.local_rank = int(os.environ.get('LOCAL_RANK', 0))
         
@@ -36,10 +38,13 @@ class DistributedJobPool:
         return self.rank == 0
     
     def barrier(self):
-        if self.world_size:
+        if self.world_size > 1:
             dist.Barrier
     def bcast(self, data, root=0):
-        return dist.bcast(data, root=root)
+        if self.world_size > 1:
+            return dist.bcast(data, root=root)
+        else:
+            return data
 
     def setup(self, backend):
         pass
