@@ -2,18 +2,11 @@ from .distributed_jobpool import DistributedJobPool
 from .job_assignment import partition_greedy
 from .utils import get_done_sessions
 from .utils import rmdir
-# from .utils import pad_matrix
 
 from .jobpool import JobPool
 
 import argparse
 import os
-# import os, re, glob, shutil, argparse
-
-# import shlex
-# import subprocess
-# import multiprocessing
-# from multiprocessing.pool import ThreadPool
 
 class Executer:
     def __init__(self):
