@@ -264,11 +264,20 @@ class Hand(base.Task):
             theta = np.random.rand() * np.pi/14 + np.pi/14
             # theta = np.pi / 7
             start_point = np.array([-r * np.sin(theta), -r * np.cos(theta), 0.1], dtype=np.float32)
+            
+            e1 = 0.02 + 0.015 * (2*np.random.rand()-1)
+            e2 = 0.10 + 0.015 * (2*np.random.rand()-1)
+
+            approach_point = np.array([e1,  0.00,  e2], dtype=np.float32)
+            # print(">>>>> END POINT IS: <<<<<", approach_point)
+            # approach_point = np.array([0.02,  0.00,  0.1], dtype=np.float32)
+            top_point = approach_point + np.array([0.00,  0.00,  0.2], dtype=np.float32)
+            # top_point = approach_point + np.array([0.02,  0.00,  0.3], dtype=np.float32)
 
             points = []
             points.append(start_point)
-            points.append(np.array([0.02,  0.00,  0.1], dtype=np.float32))
-            points.append(np.array([0.02,  0.00,  0.3], dtype=np.float32))
+            points.append(approach_point)
+            points.append(top_point)
             
             times = [self.params["environment_kwargs"]["time_limit"]/2, self.params["environment_kwargs"]["time_limit"]/3]
 
