@@ -52,9 +52,9 @@ def multi_memory_sample(memory, infos):
         #       if it works with agents actions (this will definitely cause erroneous state
         #       trajectories which can effect learning system dynamics; because s' is not a
         #       subsequence of s by action a anymore.)
-        ## if m == "replay":
-        ##     # If we are in replaying mode, we want the demo's actions to be learnt.
-        ##     buf["/agents/agent/actions"] = buf["/agents/demonstrator/actions"]
+        if m == "replay":
+            # If we are in replaying mode, we want the demo's actions to be learnt.
+            buf["/agents/agent/actions"] = buf["/agents/demonstrator/actions"]
 
         # 6. Append the sampled buffers to a single buffer
         with KeepTime("append_buffer"):

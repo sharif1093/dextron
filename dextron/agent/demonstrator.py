@@ -95,8 +95,8 @@ class NaiveController(AgentBase):
                         cmd = _GRASPER_GAIN * (_CLOSE_HAND_CLOSURE - hand_closure)
 
                     # Storing action
-                    ## actions += [[cmd]]
-                    actions += [[cmd]*5]
+                    actions += [[cmd]]
+                    ## actions += [[cmd]*5] # Use when you are giving actions for all fingers to the agent.
                     # Increasing timestep
                     hidden_state["time_step"][index] += 1
 
