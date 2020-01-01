@@ -173,6 +173,8 @@ if __name__=="__main__":
     args = parser.parse_args()
 
     args.session_names = [os.path.relpath(t, args.root_dir) for y in args.session_names for x in y for t in glob.glob(os.path.join(args.root_dir, x))]
+    if args.output_dir == '' and len(args.session_names) == 1:
+        args.output_dir = os.path.join(args.session_names[0], 'plots')
     output_dir = os.path.join(args.root_dir, args.output_dir)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
