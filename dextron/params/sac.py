@@ -36,7 +36,7 @@ cpanel["epoch_size"]    = 400  # cycles
 cpanel["number_epochs"] = 1000
 cpanel["test_activate"] = True  # Test Activate
 cpanel["test_interval"] = 10    # Test Interval Every #n Epochs
-cpanel["test_win_size"] = 5     # Number of episodes to run test.
+cpanel["test_win_size"] = 10     # Number of episodes to run test.
 cpanel["save_interval"] = 10    # Save Interval Every #n Epochs
 
 cpanel["seed"] = 0
@@ -54,7 +54,11 @@ cpanel["model_name"] = 'CustomDMCHandGrasp-v0'
 cpanel["observation_key"] = "/agent"
 cpanel["from_params"] = True
 # Environment parameters
-cpanel["time_limit"] = 6
+cpanel["time_limit"] = 10.0 # Set the maximum time here!
+cpanel["time_scale_offset"] = 0.5 # 1.0
+cpanel["time_scale_factor"] = 1.5 # 2.0
+cpanel["time_noise_factor"] = 0.2
+
 cpanel["gamma"] = 0.99     # The gamma parameter used in VecNormalize | Agent.preprocess | Agent.step
 
 # # Wrappers
@@ -78,8 +82,9 @@ cpanel["n_steps"] = 1      # From Explorer           # Number of frames to produ
 cpanel["n_update"] = 1     # From Agents: Updates per step
 cpanel["batch_size"] = 128 # From Agents
 cpanel["warm_start"] = 10000
-cpanel["replay_use_ratio"] = 0.7 #  %rur of training data comes from the "replay", where (100-%rur) comes from the "train"
-cpanel["replay_nsteps"] = 1
+cpanel["demo_use_ratio"] = 0.3 #  %rur of training data comes from the "replay", where (100-%rur) comes from the "train"
+# cpanel["replay_use_ratio"] = 0.3 #  %rur of training data comes from the "replay", where (100-%rur) comes from the "train"
+# cpanel["replay_nsteps"] = 1
 
 
 #####################
@@ -116,7 +121,10 @@ def gen_params(cpanel):
         from digideep.environment.dmc2gym.registration import EnvCreator
         from dextron.zoo.hand_env.hand import grasp
 
-        task_kwargs = {"random":None} # "teaching_rate":cpanel["teaching_rate"]
+        task_kwargs = {"generator":{"time_scale_offset":cpanel["time_scale_offset"],
+                                    "time_scale_factor":cpanel["time_scale_factor"],
+                                    "time_noise_factor":cpanel["time_noise_factor"]},
+                       "random":None} # "teaching_rate":cpanel["teaching_rate"]
         environment_kwargs = {"time_limit":cpanel["time_limit"], "control_timestep":0.02}
         params["env"]["register_args"] = {"id":cpanel["model_name"],
                                           "entry_point":"digideep.environment.dmc2gym.wrapper:DmControlWrapper",
@@ -218,14 +226,23 @@ def gen_params(cpanel):
     params["agents"]["agent"]["methodargs"]["z_lambda"] = cpanel["z_lambda"]
 
     ################
-    replay_batch_size = int(cpanel["replay_use_ratio"] * cpanel["batch_size"])
-    train_batch_size  = cpanel["batch_size"] - replay_batch_size
+    demo_batch_size = int(cpanel["demo_use_ratio"] * cpanel["batch_size"])
+    train_batch_size  = cpanel["batch_size"] - demo_batch_size
     
     params["agents"]["agent"]["sampler_list"] = ["dextron.agent.sampler.multi_memory_sample"]
     params["agents"]["agent"]["sampler_args"] = {"agent_name": params["agents"]["agent"]["name"],
-                                                 "batch_size_dict": {"train":train_batch_size, "replay":replay_batch_size},
+                                                 "batch_size_dict": {"train":train_batch_size, "demo":demo_batch_size},
                                                  "observation_path": params["agents"]["agent"]["observation_path"]
                                                 }
+
+#     replay_batch_size = int(cpanel["replay_use_ratio"] * cpanel["batch_size"])
+#     train_batch_size  = cpanel["batch_size"] - replay_batch_size
+#
+#     params["agents"]["agent"]["sampler_list"] = ["dextron.agent.sampler.multi_memory_sample"]
+#     params["agents"]["agent"]["sampler_args"] = {"agent_name": params["agents"]["agent"]["name"],
+#                                                  "batch_size_dict": {"train":train_batch_size, "replay":replay_batch_size},
+#                                                  "observation_path": params["agents"]["agent"]["observation_path"]
+#                                                 }
 
     # # It deletes the last element from the chunk
     # params["agents"]["agent"]["sampler"]["truncate_datalists"] = {"n":1} # MUST be 1 to truncate last item: (T+1 --> T)
@@ -294,17 +311,17 @@ def gen_params(cpanel):
     # Number of chunks in the buffer:
     params["memory"]["train"]["buffer_chunk_len"] = cpanel["memory_size_in_chunks"]
 
-    # params["memory"]["demo"] = {}
-    # # Number of samples in a chunk
-    # params["memory"]["demo"]["chunk_sample_len"] = cpanel["n_steps"] # params["env"]["config"]["max_episode_steps"]
-    # # Number of chunks in the buffer:
-    # params["memory"]["demo"]["buffer_chunk_len"] = cpanel["memory_size_in_chunks"]
-    
-    params["memory"]["replay"] = {}
+    params["memory"]["demo"] = {}
     # Number of samples in a chunk
-    params["memory"]["replay"]["chunk_sample_len"] = cpanel["replay_nsteps"] # params["env"]["config"]["max_episode_steps"]
+    params["memory"]["demo"]["chunk_sample_len"] = cpanel["n_steps"] # params["env"]["config"]["max_episode_steps"]
     # Number of chunks in the buffer:
-    params["memory"]["replay"]["buffer_chunk_len"] = cpanel["memory_size_in_chunks"]
+    params["memory"]["demo"]["buffer_chunk_len"] = cpanel["memory_size_in_chunks"]
+    
+#     params["memory"]["replay"] = {}
+#     # Number of samples in a chunk
+#     params["memory"]["replay"]["chunk_sample_len"] = cpanel["replay_nsteps"] # params["env"]["config"]["max_episode_steps"]
+#     # Number of chunks in the buffer:
+#     params["memory"]["replay"]["buffer_chunk_len"] = cpanel["memory_size_in_chunks"]
 
     ##############################################
 
@@ -325,7 +342,7 @@ def gen_params(cpanel):
     params["explorer"]["train"]["deterministic"] = False # MUST: Takes random actions
     params["explorer"]["train"]["n_steps"] = cpanel["n_steps"] # Number of steps to take a step in the environment
     params["explorer"]["train"]["n_episodes"] = None # Do not limit # of episodes
-    params["explorer"]["train"]["win_size"] = 10 # Number of episodes to episode reward for report
+    params["explorer"]["train"]["win_size"] = 20 # Number of episodes to episode reward for report
     params["explorer"]["train"]["render"] = False
     params["explorer"]["train"]["render_delay"] = 0
     params["explorer"]["train"]["seed"] = cpanel["seed"] + 90
@@ -342,7 +359,7 @@ def gen_params(cpanel):
     params["explorer"]["test"]["n_steps"] = None # Do not limit # of steps
     params["explorer"]["test"]["n_episodes"] = cpanel["test_win_size"]
     params["explorer"]["test"]["win_size"] = cpanel["test_win_size"] # Extra episodes won't be counted
-    params["explorer"]["test"]["render"] = False
+    params["explorer"]["test"]["render"] = True
     params["explorer"]["test"]["render_delay"] = 0
     params["explorer"]["test"]["seed"] = cpanel["seed"] + 100 # We want to make the seed of test environments different from training.
     params["explorer"]["test"]["extra_env_kwargs"] = {"mode":params["explorer"]["test"]["mode"], "allow_demos":False}
@@ -381,20 +398,20 @@ def gen_params(cpanel):
     params["explorer"]["demo"]["extra_env_kwargs"] = {"mode":params["explorer"]["demo"]["mode"], "allow_demos":True}
 
 
-    params["explorer"]["replay"] = {}
-    params["explorer"]["replay"]["mode"] = "replay"
-    params["explorer"]["replay"]["env"] = params["env"]
-    params["explorer"]["replay"]["do_reset"] = False
-    params["explorer"]["replay"]["final_action"] = False
-    params["explorer"]["replay"]["warm_start"] = 0
-    params["explorer"]["replay"]["num_workers"] = cpanel["num_workers"]
-    params["explorer"]["replay"]["deterministic"] = False # MUST: Takes random actions
-    params["explorer"]["replay"]["n_steps"] = cpanel["replay_nsteps"] # Number of steps to take a step in the environment
-    params["explorer"]["replay"]["n_episodes"] = None
-    params["explorer"]["replay"]["win_size"] = 10
-    params["explorer"]["replay"]["render"] = False # False
-    params["explorer"]["replay"]["render_delay"] = 0
-    params["explorer"]["replay"]["seed"] = cpanel["seed"] + 50
-    params["explorer"]["replay"]["extra_env_kwargs"] = {"mode":params["explorer"]["replay"]["mode"], "allow_demos":False}
+#     params["explorer"]["replay"] = {}
+#     params["explorer"]["replay"]["mode"] = "replay"
+#     params["explorer"]["replay"]["env"] = params["env"]
+#     params["explorer"]["replay"]["do_reset"] = False
+#     params["explorer"]["replay"]["final_action"] = False
+#     params["explorer"]["replay"]["warm_start"] = 0
+#     params["explorer"]["replay"]["num_workers"] = cpanel["num_workers"]
+#     params["explorer"]["replay"]["deterministic"] = False # MUST: Takes random actions
+#     params["explorer"]["replay"]["n_steps"] = cpanel["replay_nsteps"] # Number of steps to take a step in the environment
+#     params["explorer"]["replay"]["n_episodes"] = None
+#     params["explorer"]["replay"]["win_size"] = 10
+#     params["explorer"]["replay"]["render"] = False # False
+#     params["explorer"]["replay"]["render_delay"] = 0
+#     params["explorer"]["replay"]["seed"] = cpanel["seed"] + 50
+#     params["explorer"]["replay"]["extra_env_kwargs"] = {"mode":params["explorer"]["replay"]["mode"], "allow_demos":False}
 
     return params
