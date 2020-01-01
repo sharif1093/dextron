@@ -6,6 +6,10 @@ for solving the dexterous prosthetic hand manipulation.
 ## Command-line execution
 
 ```bash
+python -m digideep.main --save-modules "dextron" --params dextron.params.sac2 --cpanel '{"time_limit":6}'
+python -m digideep.main --save-modules "dextron" --params dextron.params.sac --cpanel '{"time_limit":6, "teaching_rate":0.7, "test_activate":true, "test_interval":2}'
+
+
 ## Train mode, With session: A typical training
 python -m digideep.main --save-modules "dextron" --params dextron.params.default --cpanel '{"time_limit":6}'
 # python -m digideep.main --save-modules "dextron" --params dextron.params.sac2 --cpanel '{"time_limit":6}'
