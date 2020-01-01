@@ -20,8 +20,15 @@ from gym.envs.registration import register
 
 _CONTROL_TIMESTEP = .02 # (Seconds)
 _DEFAULT_TIME_LIMIT = 6 # Default duration of an episode, in seconds.
+_DEFAULT_TIME_SCALE_OFFSET = 0.5 # 1.0
+_DEFAULT_TIME_SCALE_FACTOR = 1.5 # 2.0
+_DEFAULT_TIME_NOISE_FACTOR = 0.2
 
-task_kwargs = {"random":None, "teaching_rate":0.5}
+task_kwargs = {"generator":{"time_scale_offset":_DEFAULT_TIME_SCALE_OFFSET,
+                            "time_scale_factor":_DEFAULT_TIME_SCALE_FACTOR,
+                            "time_noise_factor":_DEFAULT_TIME_NOISE_FACTOR},
+               "random":None,}
+
 environment_kwargs = {"time_limit":_DEFAULT_TIME_LIMIT, "control_timestep":_CONTROL_TIMESTEP}
 
 register(

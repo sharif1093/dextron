@@ -34,11 +34,20 @@ from .grasp_controllers import GraspControllerIndividualVelocity
 # from .grasp_controllers import GraspControllerAllPosition
 # from .grasp_controllers import GraspControllerAllStep
 
+# Import trajectory generators
+# from .trajectory_generator import generate_randomized_simulated_approach
+from .trajectory_generator import generate_sampled_real_trajectory
+from .mocap_controller import MocapController
+
 ######################################################################################
 ## Model Constants and Tasks ##
 ###############################
 _MODEL_NAME = "bb_left_hand"
-_GRASP_CONTROLLER_AGENT = GraspControllerIndividualVelocity
+## Teacher in reduced space. Robot in bigger space.
+# _GRASP_CONTROLLER_AGENT = GraspControllerIndividualVelocity
+# _GRASP_CONTROLLER_TEACHER = GraspControllerAllVelocity
+## Robot and teacher be in the parameterized grasp:
+_GRASP_CONTROLLER_AGENT = GraspControllerAllVelocity
 _GRASP_CONTROLLER_TEACHER = GraspControllerAllVelocity
 # _NUM_ACTION = 2
 
@@ -124,36 +133,6 @@ class Physics(mujoco.Physics):
 #   * Horizontal speed of the Hopper:       self.named.data.sensordata['torso_subtreelinvel'][0]
 #   * Signals from two foot touch sensors:  np.log1p(self.named.data.sensordata[['touch_toe', 'touch_heel']])
 
-######################################################################################
-#### Utility Functions ####
-###########################
-
-########################
-# Trajectory Generator #
-########################
-def gen_traj_min_jerk(point_start, point_end, T, dt):
-    t = 0
-    R = 0.01*T
-    
-    N = point_start.shape[0]
-    
-    q = np.zeros((N,3))
-    q[:,0] = point_start
-    u = point_end
-    while t<=T:
-        D = T - t + R
-        A = np.array([[0,1,0],[0,0,1],[-60/D**3,-36/D**2,-9/D]], dtype=np.float32)
-        B = np.array([0,0,60/D**3], dtype=np.float32)
-        
-        for i in range(N):
-            q[i,:] = q[i,:] + dt*(np.matmul(A,q[i,:])+B*u[i])
-        
-        t = t+dt
-        #       pos   vel    acc
-        yield q[:,0],q[:,1],q[:,2]
-######################################################################################
-
-
 
 ######################################################################################
 #### Task ####
@@ -176,17 +155,8 @@ class Hand(base.Task):
 
         # All possible modes: train, test, eval, demo, replay
         self.explorer_mode = self.params.get("mode", "train")
-        # if self.explorer_mode == "demo":
-        #     self.mode = "teaching"
-        # elif self.explorer_mode in ["train", "replay", "test", "eval"]:
-        #     self.mode = "training"
-        
         self.mode = None
-        
-
-        # self.teaching_rate = self.params.get("teaching_rate", 0.5)
-        # print("Teaching Rate:", self.teaching_rate)
-        # self.mode = None # "training" | "teaching"
+        self.termination = None
         
         super(Hand, self).__init__(random=self.params.get("random", None))
 
@@ -199,149 +169,96 @@ class Hand(base.Task):
         4. Assign the mocap quat: physics.named.data.mocap_quat["mocap"]
         """
 
+        self.termination = False
+
         if self.allow_demos:
+            print(">>>> TEACHING in explorer [{}].".format(self.explorer_mode))
             self.mode = "teaching"
-            print(">>>> ATTENTION! We are using teaching mode in explorer [{}]. <<<<".format(self.explorer_mode))
         else:
+            print(">>>> TRAINING in explorer [{}].".format(self.explorer_mode))
             self.mode = "training"
+        
 
-
-        # self.grasper = {}
-        # self.grasper["training"] = _GRASP_CONTROLLER_AGENT(physics)
-        # self.grasper["teaching"] = _GRASP_CONTROLLER_TEACHER(physics)
-
+        # Grasp controllers in the teaching and training modes can be different.
         self.grasper = {}
         self.grasper["training"] = _GRASP_CONTROLLER_AGENT(physics)
-        self.grasper["teaching"] = _GRASP_CONTROLLER_AGENT(physics)
+        self.grasper["teaching"] = _GRASP_CONTROLLER_TEACHER(physics)
+
+
+        ## For simulated trajectories:
+        # generator = generate_randomized_simulated_approach(self.params["environment_kwargs"], self.params["generator"], )
+
+        # TODO: Randomize the time_limit but not the control_limit.
+        generator = generate_sampled_real_trajectory(self.params["environment_kwargs"], self.params["generator"], extracts_path="/workspace/extracts")
+        self.mocap_controller = MocapController(generator)
         
+        
+        ######################################
+        ## Initialization of mocap and hand ##
+        ######################################
+        # Move 1-step forward to set the initial pose of the mocap body.
+        self.mocap_controller.step(physics)
 
-        # random_mode_selection = np.random.rand()
-        # # For 20% of all times, start with a teacher mode.
-        # if (random_mode_selection < self.teaching_rate) and (self.teaching_allowed):
-        #     self.mode = "teaching"
-        #     print("--------- TEACHING MODE ---------")
-        # else:
-        #     self.mode = "training"
-        #     print("+++++++++ TRAINING MODE +++++++++")
-        # # print("Distance to hand is = ", physics.get_distance_in_xy_plane())
-
-
-
-        #########################################
-        ### Randomizations of the environment ###
-        #########################################
-        a1 = np.random.rand()
-        # For 10% of all times, start from a grasped position.
+        # NOTE: If you want to solve the issue of jumps in the hand position when setting the mocap position,
+        #       you should also set the pos of the hand base to the corresponding adjacent value, so that they
+        #       will be neighbors in the new config.
+        ## Set the robot hand initial pose:
         offset = np.array([0,0.015,0], dtype=np.float32)
-        if a1 > 1: # 0.8
-            # # This part is not executed at all for now.
-            # start_point = np.array([0.02, 0.00, 0.1], dtype=np.float32)
-
-            # points = []
-            # points.append(start_point)
-            # points.append(np.array([0.02,  0.00,  0.3], dtype=np.float32))
-
-            # times = [self.params["environment_kwargs"]["time_limit"]/3]
-            pass
-
-        else:
-            # a0 = np.random.rand() * 0.01
-            # a0 = 0 # No randomization at all!
-
-            ## Randomizing initial position x coordinate on the x axis:
-            # a0 = np.random.rand() * 0.04 - 0.1
-            # start_point = np.array([a0, -0.35, 0.2], dtype=np.float32)
-
-            ## Randomizing initial position x&y on a quadcircle:
-            
-            # NOTE: Don't start too close, give the agent some time.
-            r = np.random.rand() * 0.25 + 0.1
-            # r = np.random.rand() * 0.30 + 0.05
-            # r = np.random.rand() * 0.35 + 0
-            # r = 0.35
-            # theta = np.random.rand() * np.pi / 6
-            # theta = np.random.rand() * np.pi/3 - np.pi/6 + np.pi/7
-            theta = np.random.rand() * np.pi/14 + np.pi/14
-            # theta = np.pi / 7
-            start_point = np.array([-r * np.sin(theta), -r * np.cos(theta), 0.1], dtype=np.float32)
-            
-            e1 = 0.02 + 0.015 * (2*np.random.rand()-1)
-            e2 = 0.10 + 0.015 * (2*np.random.rand()-1)
-
-            approach_point = np.array([e1,  0.00,  e2], dtype=np.float32)
-            # print(">>>>> END POINT IS: <<<<<", approach_point)
-            # approach_point = np.array([0.02,  0.00,  0.1], dtype=np.float32)
-            top_point = approach_point + np.array([0.00,  0.00,  0.2], dtype=np.float32)
-            # top_point = approach_point + np.array([0.02,  0.00,  0.3], dtype=np.float32)
-
-            points = []
-            points.append(start_point)
-            points.append(approach_point)
-            points.append(top_point)
-            
-            times = [self.params["environment_kwargs"]["time_limit"]/2, self.params["environment_kwargs"]["time_limit"]/3]
-
+        if not self.mocap_controller.mocap_pos is None:
+            physics.named.data.qpos["base_link_joint"][:3] = self.mocap_controller.mocap_pos + offset
+        if not self.mocap_controller.mocap_quat is None:
+            physics.named.data.qpos["base_link_joint"][3:7] = self.mocap_controller.mocap_quat
         
-        # NOTE: I noticed that qpos initializations do not always work as expected.
-        #       Sometimes they just do not go the the given values.
-        # Randomized initial finger positions by directly setting the joint values:
-        # t = np.random.rand()
-        t = 0.5
+
+        ###################################
+        ## Setting finger initial values ##
+        ###################################
+        # Start half-closed
+        t = 0.5 # np.random.rand()
         physics.named.data.qpos["TPJ"] = -0.57*t #-0.57 0
         physics.named.data.qpos["IPJ"] = 1.57*t  # 0 1.57
         physics.named.data.qpos["MPJ"] = 1.57*t  # 0 1.57
         physics.named.data.qpos["RPJ"] = 1.57*t  # 0 1.57
         physics.named.data.qpos["PPJ"] = 1.57*t  # 0 1.57
 
-        # Setting the mocap position:
-        physics.named.data.mocap_pos["mocap"] = start_point
-        # The following doesn't seem to be working successfully:
-        physics.named.data.xpos["base_link"] = start_point + offset
 
-        self.mocap_traj = []
-        for i in range(len(points)-1):
-            self.mocap_traj.append(gen_traj_min_jerk(points[i], points[i+1], times[i],
-                                   self.params["environment_kwargs"]["control_timestep"]))
-        self.mocap_traj_index = 0
+        super(Hand, self).initialize_episode(physics)
 
-        # TODO: If you want to solve the issue of jumps in the hand position when setting the mocap position,
-        #       you should also set the pos of the hand base to the corresponding adjacent value, so that they
-        #       will be neighbors in the new config.
         
 
     def action_spec(self, physics):
-        """Returns a `BoundedArraySpec` matching the `physics` actuators."""
+        """Returns a `BoundedArray` matching the `physics` actuators."""
         # TODO: "grasper" should be made here. Also, "grasper" should possibly determine the specs of agents.
         spec = collections.OrderedDict()
-        # Setting actuator types, which is a BoundedArraySpec:
+        # Setting actuator types, which is a BoundedArray:
 
         ## 1) Position/Velocity [continuous] control on individual actuators:
         # spec["agent"] = mujoco.action_spec(physics)
         ## 2) Velocity [discrete] control for all fingers simultaneously:
-        # spec["agent"] = specs.BoundedArraySpec(shape=(1,), dtype=np.int, minimum=0, maximum=_NUM_ACTION)
+        # spec["agent"] = specs.BoundedArray(shape=(1,), dtype=np.int, minimum=0, maximum=_NUM_ACTION)
         ## 3) Position control for all fingers simultaneously:
-        # spec["agent"] = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=0, maximum=1) # 1: Fully closed || 0: Fully open
+        # spec["agent"] = specs.BoundedArray(shape=(1,), dtype=np.float, minimum=0, maximum=1) # 1: Fully closed || 0: Fully open
         ## 4) Velocity control (continuous) for all fingers simultaneously:
-        # spec["agent"]        = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
-        # spec["demonstrator"] = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
+        spec["agent"]        = specs.BoundedArray(shape=(1,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
+        spec["demonstrator"] = specs.BoundedArray(shape=(1,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
         ## 5) Velocity control (continuous) on individual fingers
         # TODO: Different action shapes MUST produce an error!
-        ## spec["agent"]        = specs.BoundedArraySpec(shape=(5,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
-        ## spec["demonstrator"] = specs.BoundedArraySpec(shape=(1,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
+        ## spec["agent"]        = specs.BoundedArray(shape=(5,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
+        ## spec["demonstrator"] = specs.BoundedArray(shape=(1,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
 
-        spec["agent"]        = specs.BoundedArray(shape=(5,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
-        spec["demonstrator"] = specs.BoundedArray(shape=(5,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
+        # spec["agent"]        = specs.BoundedArray(shape=(5,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
+        # spec["demonstrator"] = specs.BoundedArray(shape=(5,), dtype=np.float, minimum=-1, maximum=1) # -1: Max speed openning || 1: Max speed closing
 
         
         # physics.model.nmocap
         # NOTE: In the current implementation we are not using "mocap" as an external action.
         #       "mocap" related actions are produced internally.
         #
-        # spec["mocap"] = specs.BoundedArraySpec(shape=(3,),
-        #                                        dtype=np.float32,
-        #                                        minimum=np.array([0, 0, 0 ]),
-        #                                        maximum=np.array([.1,.1,.1]), # Are the maximum values correct?
-        #                                        name="mocap")
+        # spec["mocap"] = specs.BoundedArray(shape=(3,),
+        #                                    dtype=np.float32,
+        #                                    minimum=np.array([0, 0, 0 ]),
+        #                                    maximum=np.array([.1,.1,.1]), # Are the maximum values correct?
+        #                                    name="mocap")
         return spec
 
     def before_step(self, action, physics):
@@ -364,21 +281,13 @@ class Hand(base.Task):
         elif self.mode == "teaching":
             ctrl_actions = self.grasper["teaching"](action["demonstrator"], physics)
         
-        # 3) Send lowest-level actions for execution in the simulator.
+        # 3) Send low-level actions for execution in the simulator.
         super(Hand, self).before_step(ctrl_actions, physics)
         
-        # Setting the mocap bodies to move:
-        try:
-            mocap_pos, mocap_vel, mocap_acc = next(self.mocap_traj[self.mocap_traj_index])
-            physics.named.data.mocap_pos["mocap"] = mocap_pos
-        except StopIteration:
-            if self.mocap_traj_index<len(self.mocap_traj)-1:
-                self.mocap_traj_index += 1
-        
-        ###### physics.named.data.mocap_pos["mocap"] = action["mocap"]
-
-        # We have a mocap_quat as well.
-        
+        # Step the mocap body
+        self.mocap_controller.step(physics)
+        if self.mocap_controller.termination:
+            self.termination = True
 
 
 
@@ -467,8 +376,7 @@ class Hand(base.Task):
     def get_termination(self, physics):
         """Terminates when the we are not good."""
         height = physics.named.data.xipos['long_cylinder', 'z']
-        if height < 0.120:
+        if self.termination or (height < 0.120):
+            # `self.termination` is a class-level flag to indicate
+            # the moment for termination.
             return 0.0
-
-
-

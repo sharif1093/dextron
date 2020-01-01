@@ -128,27 +128,31 @@
         <!-- /table -->
 
         <!-- object -->
-        <body name="long_cylinder" pos=".06 0.1 0.125" quat="1 0 0 0">
+        
+        <!-- <body name="long_cylinder" pos=".06 0.1 0.125" quat="1 0 0 0"> -->
+            <body name="long_cylinder" pos="0. 0. 0.125" quat="1 0 0 0">
             <joint type="free" damping="0" armature="0" limited="false"/>
             <!-- <geom type="box" size="0.025 0.025 0.025" material="MatSquare"/>  -->
             
             <!-- <geom type="cylinder" pos="0 0 0" size="0.025 0.125" material="target" /> -->
             <!-- material="MatWoodB" -->
-            <geom type="cylinder" pos="0 0 0" size="0.020 0.125" material="target" />
+            <geom type="cylinder" pos="0 0 0" size="0.030 0.125" material="target" />
             
             <!-- <inertial pos="0 0 0" quat="1 0 0 0" mass="0.49087385212340523" diaginertia="0.00263333 0.00263333 0.0001534"/> -->
         </body>
         <!-- /object -->
 
         <!-- <body name="mocap" mocap="true" pos="0 -0.35 0.2" quat="0 0 0 1" axisangle="0 0 1 3.141592"> -->
-        <body name="mocap" mocap="true" pos="0 -0.35 0.2" quat="0 0 0 1">
+        <body name="mocap" mocap="true" pos="0 -0.35 0.2" quat="1 0 0 0">
             <geom type="box" group="1" size="0.015 0.015 0.015" contype="0" conaffinity="0" rgba=".9 .5 .5 1"/>
         </body>
 
         <!-- ROBOT -->
         <!-- <body childclass="Generic" name="base_link" pos="0 -0.335 0.2" quat="0 0 3.1415 0.1"> -->
-        <body childclass="Generic" name="base_link" pos="0 -0.335 0.2" quat="3.1415 0 3.1415 0" > <!-- quat="2.36 0 3.1415 0" -->
-            <joint type="free" damping="0" armature="0" limited="false"/>
+        <!-- quat="2.36 0 3.1415 0" -->
+        <!-- quat="3.1415 0 3.1415 0" -->
+        <body childclass="Generic" name="base_link" pos="0 -0.335 0.2" quat="1 0 0 0" >
+            <joint name="base_link_joint" type="free" damping="0" armature="0" limited="false"/>
 
             <site name="palm_center" pos="0 0.09 0.03"/>
 
