@@ -39,7 +39,6 @@ from .trajectory_generator import generate_randomized_simulated_approach
 from .trajectory_generator import generate_sampled_real_trajectory
 from .mocap_controller import MocapController
 
-from PIL import Image
 ######################################################################################
 ## Model Constants and Tasks ##
 ###############################
@@ -128,8 +127,7 @@ class Physics(mujoco.Physics):
         return hand_closure
     
     def rgb2gray(self, rgb):
-        # return np.expand_dims(np.dot(rgb[...,:3], [0.2989, 0.5870, 0.1140]), axis=0)
-        return np.expand_dims(np.dot(rgb[...,:3], [.6, 0.1, 0.3]), axis=0)
+        return np.expand_dims(np.dot(rgb[...,:3], [0.2989, 0.5870, 0.1140]), axis=0)
 
 
     # def get_digit_contact_forces(self)
@@ -156,20 +154,14 @@ class Hand(base.Task):
         # NOTE: We access to the "extra_env_kwargs" params not to the whole "explorer" params.
         self.params = params
         
-        self.exclude_obs = self.params.get("exclude_obs", [])
-
         # Here we first try to ping "allow_demos". If it is absent we see if mode is "train". Then we allow training otherwise no.
         self.allow_demos = self.params.get("allow_demos", False)
-        # pub_cameras: Whether to publish camera image or not.
-        self.pub_cameras = self.params.get("pub_cameras", False)
 
         # All possible modes: train, test, eval, demo, replay
         self.explorer_mode = self.params.get("mode", "train")
         self.mode = None
         self.termination = None
-        self.episode = 0
-        self.counter = 0
-
+        
         super(Hand, self).__init__(random=self.params.get("random", None))
 
     def initialize_episode(self, physics):
@@ -182,7 +174,6 @@ class Hand(base.Task):
         """
 
         self.termination = False
-        self.episode += 1
 
         if self.allow_demos:
             print(">>>> TEACHING in explorer [{}].".format(self.explorer_mode))
@@ -323,10 +314,8 @@ class Hand(base.Task):
         #############
         # Ignores horizontal position to maintain translational invariance:
         obs["agent"] = collections.OrderedDict()
-        if not "position" in self.exclude_obs:
-            obs["agent"]['position'] = physics.data.qpos[:].copy()
-        if not "velocity" in self.exclude_obs:
-            obs["agent"]['velocity'] = physics.data.qvel[:].copy()
+        obs["agent"]['position'] = physics.data.qpos[:].copy()
+        obs["agent"]['velocity'] = physics.data.qvel[:].copy()
 
         # obs['mocap_pos'] = physics.data.mocap_pos[:].copy()
         # obs['mocap_quat'] = physics.data.mocap_quat[:].copy()
@@ -334,46 +323,21 @@ class Hand(base.Task):
         # obs['xpos_object'] = physics.named.data.xpos['long_cylinder'].copy()
         # obs['xquat_object'] = physics.named.data.xquat['long_cylinder'].copy()
 
-        if not "rel_obj_hand" in self.exclude_obs:
-            obs["agent"]["rel_obj_hand"] = physics.data.mocap_pos[:].copy() - physics.named.data.xpos['long_cylinder'].copy()
-        if not "rel_obj_hand_dist" in self.exclude_obs:
-            obs["agent"]["rel_obj_hand_dist"] = np.linalg.norm(physics.data.mocap_pos[:].copy() - physics.named.data.xpos['long_cylinder'].copy())
-        if not "distance2" in self.exclude_obs:
-            obs["agent"]["distance2"] = physics.get_distance_in_xy_plane()
-        if not "closure" in self.exclude_obs:
-            obs["agent"]["closure"] = physics.get_hand_closure()
-            
+        obs["agent"]['rel_obj_hand'] = physics.data.mocap_pos[:].copy() - physics.named.data.xpos['long_cylinder'].copy()
+        obs["agent"]['rel_obj_hand_dist'] = np.linalg.norm(physics.data.mocap_pos[:].copy() - physics.named.data.xpos['long_cylinder'].copy())
+
+        obs["agent"]['distance2'] = physics.get_distance_in_xy_plane()
+
 
         #############################
         ### Cameras ###
         ###############
         # render(height=240, width=320, camera_id=-1, overlays=(), depth=False, segmentation=False, scene_option=None)
-        if self.pub_cameras:
-            obs["camera"] = physics.rgb2gray(physics.render(width=60*4, height=60*3, camera_id="fixed")).astype(np.uint8)
+        # obs["camera"] = physics.rgb2gray(physics.render(width=60*4, height=60*3, camera_id="fixed")).astype(np.uint8)
+        obs["camera"] = physics.rgb2gray(physics.render(width=30*4, height=30*3, camera_id="fixed")).astype(np.uint8)
+
         # print(obs["camera"].shape)
         # (256, 4, 84, 84)
-
-
-        # cam = physics.render(width=4*60*4, height=4*60*3, camera_id="fixed")
-        # self.counter += 1
-        # img = Image.fromarray(cam)
-        # # img = img.convert("L")
-        # img.save("/home/sharif/frames/{:04d}.jpg".format(self.counter))
-        
-
-
-        # 
-        # print("position shape:", obs["agent"]['position'].shape)
-        # print("velocity shape:", obs["agent"]['velocity'].shape)
-        # print(physics.named.data.qpos)
-        # print("--------------------------")
-        # print(physics.named.data.qvel)
-
-        # exit()
-        
-
-
-
         
         # AGEN: (90, 4, 60, 80)
         # DEMO: (38, 4, 60, 80)

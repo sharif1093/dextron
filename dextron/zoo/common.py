@@ -11,7 +11,7 @@ def getAssets(root, addr):
     path = os.path.join(root, addr)
     if os.path.isdir(path):
         tree = list(Path(path).rglob("*"))
-        file_list = [e for e in tree if not os.path.isdir(e)]
+        file_list = [str(e) for e in tree if not os.path.isdir(str(e))]
     else:
         file_list = [path]
     

@@ -132,7 +132,7 @@ def gen_traj_min_jerk(point_start, point_end, T, dt):
         #        pos   vel    acc
         #yield q[:,0],q[:,1],q[:,2]
         
-        yield t, q[:,0], None
+        yield t, q[:,0], np.array([1,0,1,0],dtype=np.float32)
 
 ###########################
 # Generate randomized env #
@@ -140,16 +140,24 @@ def gen_traj_min_jerk(point_start, point_end, T, dt):
 
 def generate_randomized_simulated_approach(environment_kwargs, generator_kwargs):
     ## Randomizing initial position x&y on a quadcircle:
-    # NOTE: Don't start too close, give the agent some time.
-    r = np.random.rand() * 0.25 + 0.1
-    theta = np.random.rand() * np.pi/14 + np.pi/14
 
+    # theta = np.random.rand() * np.pi/7 + np.pi/7
+    theta = np.random.rand() * np.pi/14 + np.pi/14
+    
+    # NOTE: Don't start too close, give the agent some time.
+    r = np.random.rand() * 0.35 + 0.25
     start_point = np.array([-r * np.sin(theta), -r * np.cos(theta), 0.1], dtype=np.float32)
     
-    e1 = 0.02 + 0.020 * (2*np.random.rand()-1)
-    e2 = 0.10 + 0.020 * (2*np.random.rand()-1)
+    ## PREVIOUSLY USED TO BE:
+    ex = -0.045 # + 0.020 * (2*np.random.rand()-1)
+    ey = -0.10
 
-    approach_point = np.array([e1,  0.00,  e2], dtype=np.float32)
+    # ex = -0.05  + 0.020 * (2*np.random.rand()-1)
+    # ey = -0.095 + 0.020 * (2*np.random.rand()-1)
+
+    ez = 0.10 + 0.020 * (2*np.random.rand()-1)
+
+    approach_point = np.array([ex,  ey,  ez], dtype=np.float32)
     top_point = approach_point + np.array([0.00,  0.00,  0.2], dtype=np.float32)
 
     points = []
@@ -168,4 +176,4 @@ def generate_randomized_simulated_approach(environment_kwargs, generator_kwargs)
     for i in range(len(points)-1):
         mocap_traj.append(gen_traj_min_jerk(points[i], points[i+1], times[i], control_timestep))
     
-    return start_point, mocap_traj
+    return mocap_traj

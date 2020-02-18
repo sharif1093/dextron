@@ -3,8 +3,10 @@ import warnings
 from copy import deepcopy
 
 from digideep.agent.sampler_common import get_memory_params # , Compose
-from digideep.agent.ddpg.sampler import get_sample_memory
 from digideep.utility.profiling import KeepTime
+from digideep.utility.logging import logger
+
+from digideep.agent.ddpg.sampler import get_sample_memory
 
 
 def append_common_keys(list_of_dicts):
@@ -18,7 +20,7 @@ def append_common_keys(list_of_dicts):
                 res[key] = np.append(res[key], item[key], axis=0)
             else:
                 # Key does not exist in at least one of the items. So delete it from res as well.
-                print("We had to delete [{}] key from base item.".format(key))
+                logger.debug("We had to delete [{}] key from base item.".format(key))
                 del res[key]
     
     return res
@@ -37,12 +39,12 @@ def multi_memory_sample(memory, infos):
             info["batch_size"] = infos["batch_size_dict"][m]
             batch_size += info["batch_size"]
             #### print("For {} we have bs = {}".format(m, info["batch_size"]))
-        with KeepTime("get_memory_params"):
-            # 3. Get the memory parameters of the specified key
-            mem = get_memory_params(memory[m], info)
+        # with KeepTime("get_memory_params"):
+        #     # 3. Get the memory parameters of the specified key
+        #     mem = get_memory_params(memory[m], info)
         with KeepTime("get_sample_memory"):
             # 4. Do the actual sampling from the memory
-            buf = get_sample_memory(mem, info)
+            buf = get_sample_memory(memory[m], info)
         if buf is None:
             # print("Not enough data in [{}].".format(m))
             return None
@@ -65,12 +67,12 @@ def multi_memory_sample(memory, infos):
     with KeepTime("append_common_keys"):
         buffer = append_common_keys(list_of_buffers)
     
-    with KeepTime("shuffle_inside"):
-        # Shuffle inside the buffer:
-        # NOTE: It does not matter most probably. Just in case ...
-        p = np.random.permutation(batch_size)
-        for key in buffer:
-            buffer[key] = buffer[key][p, ...]
+    # with KeepTime("shuffle_inside"):
+    #     # Shuffle inside the buffer:
+    #     # NOTE: It does not matter most probably. Just in case ...
+    #     p = np.random.permutation(batch_size)
+    #     for key in buffer:
+    #         buffer[key] = buffer[key][p, ...]
 
     # print(buffer.keys())
     # exit()

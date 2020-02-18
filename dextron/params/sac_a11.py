@@ -26,25 +26,39 @@ from collections import OrderedDict
 #    methods, but have different names.
 
 
+# In case of multi-workers, change the following:
+#   - cpanel["memory_size_in_chunks"] = int(5e3)
+#   - cpanel["demo_memory_size_in_chunks"] = int(5e3)
+#   - cpanel["num_workers"] = 20
+#   - cpanel["n_update"] = 4
+
+
 cpanel = OrderedDict()
 
 #####################
 ### Runner Parameters
 # num_frames = 10e6  # Number of frames to train
-cpanel["runner_name"]   = "dextron.pipeline.PlaybackRunner"
-cpanel["epoch_size"]    = 400  # cycles
-cpanel["number_epochs"] = 1000
+cpanel["runner_name"]   = "dextron.pipeline.replay_runner.PlaybackRunner"
+cpanel["number_epochs"] = 10000 # epochs
+cpanel["epoch_size"]    = 1000  # cycles
 cpanel["test_activate"] = True  # Test Activate
 cpanel["test_interval"] = 10    # Test Interval Every #n Epochs
-cpanel["test_win_size"] = 10     # Number of episodes to run test.
+cpanel["test_win_size"] = 10    # Number of episodes to run test.
 cpanel["save_interval"] = 10    # Save Interval Every #n Epochs
+
+
+cpanel["scheduler_start"] = 0.3
+cpanel["scheduler_steps"] = cpanel["epoch_size"] * 100
+cpanel["scheduler_decay"] = 1.0 # Never reduce!
+# cpanel["scheduler_decay"] = .95
 
 cpanel["seed"] = 0
 cpanel["cuda_deterministic"] = False # With TRUE we MIGHT get more deterministic results but at the cost of speed.
 
 #####################
 ### Memory Parameters
-cpanel["memory_size_in_chunks"] = int(1e6) # SHOULD be 1 for on-policy methods that do not have a replay buffer.
+cpanel["memory_size_in_chunks"] = int(1e5)      # SHOULD be 1 for on-policy methods that do not have a replay buffer.
+cpanel["demo_memory_size_in_chunks"] = int(1e5) # SHOULD be 1 for on-policy methods that do not have a replay buffer.
 # SUGGESTIONS: 2^0 (~1e0) | 2^3 (~1e1) | 2^7 (~1e2) | 2^10 (~1e3) | 2^13 (~1e4) | 2^17 (1e5) | 2^20 (~1e6)
 
 ##########################
@@ -53,6 +67,7 @@ cpanel["memory_size_in_chunks"] = int(1e6) # SHOULD be 1 for on-policy methods t
 cpanel["model_name"] = 'CustomDMCHandGrasp-v0'
 cpanel["observation_key"] = "/agent"
 cpanel["from_params"] = True
+cpanel["pub_cameras"] = False
 # Environment parameters
 cpanel["time_limit"] = 10.0 # Set the maximum time here!
 cpanel["time_scale_offset"] = 0.5 # 1.0
@@ -76,11 +91,11 @@ cpanel["gamma"] = 0.99     # The gamma parameter used in VecNormalize | Agent.pr
 ##################################
 ### Exploration/Exploitation Balance
 ### Exploration (~ num_workers * n_steps)
-cpanel["num_workers"] = 1  # From Explorer           # Number of exploratory workers working together
-cpanel["n_steps"] = 1      # From Explorer           # Number of frames to produce
+cpanel["num_workers"] = 1     # From Explorer           # Number of exploratory workers working together
+cpanel["n_steps"] = 1         # From Explorer           # Number of frames to produce
 ### Exploitation (~ n_update * batch_size)
-cpanel["n_update"] = 1     # From Agents: Updates per step
-cpanel["batch_size"] = 128 # From Agents
+cpanel["n_update"] = 1        # From Agents: Updates per step
+cpanel["batch_size"] = 128    # From Agents
 cpanel["warm_start"] = 10000
 cpanel["demo_use_ratio"] = 0.3 #  %rur of training data comes from the "replay", where (100-%rur) comes from the "train"
 # cpanel["replay_use_ratio"] = 0.3 #  %rur of training data comes from the "replay", where (100-%rur) comes from the "train"
@@ -89,6 +104,7 @@ cpanel["demo_use_ratio"] = 0.3 #  %rur of training data comes from the "replay",
 
 #####################
 ### Agents Parameters
+cpanel["agent_type"] = "dextron.agent.sac.a11.agent.Agent"
 cpanel["lr_value"] = 3e-4
 cpanel["lr_softq"] = 3e-4
 cpanel["lr_actor"] = 3e-4
@@ -124,14 +140,17 @@ def gen_params(cpanel):
         task_kwargs = {"generator":{"time_scale_offset":cpanel["time_scale_offset"],
                                     "time_scale_factor":cpanel["time_scale_factor"],
                                     "time_noise_factor":cpanel["time_noise_factor"]},
-                       "random":None} # "teaching_rate":cpanel["teaching_rate"]
+                       "random":None,
+                       "pub_cameras":cpanel["pub_cameras"]} # "teaching_rate":cpanel["teaching_rate"]
+        
+        # visualize_reward=True
         environment_kwargs = {"time_limit":cpanel["time_limit"], "control_timestep":0.02}
         params["env"]["register_args"] = {"id":cpanel["model_name"],
                                           "entry_point":"digideep.environment.dmc2gym.wrapper:DmControlWrapper",
                                           "kwargs":{'dmcenv_creator':EnvCreator(grasp,
                                                                                 task_kwargs=task_kwargs,
                                                                                 environment_kwargs=environment_kwargs,
-                                                                                visualize_reward=True),
+                                                                                visualize_reward=False),
                                                     'flat_observation':False,
                                                     'observation_key':"agent"}
                                          }
@@ -146,6 +165,10 @@ def gen_params(cpanel):
                               args={"path":cpanel["observation_key"],
                               },
                               enabled=True))
+    # norm_wrappers.append(dict(name="digideep.environment.wrappers.normal.WrapperTransposeImage",
+    #                           args={"path":"/camera"
+    #                           },
+    #                           enabled=True))
     # Normalizing actions (to be in [-1, 1])
     norm_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.WrapperNormalizeActDict",
                               args={"paths":["agent"]},
@@ -156,6 +179,12 @@ def gen_params(cpanel):
     #######################
     vect_wrappers = []
 
+    if cpanel["pub_cameras"]:
+        vect_wrappers.append(dict(name="digideep.environment.wrappers.vector.VecFrameStackAxis",
+                                args={"path":"/camera",
+                                        "nstack":4, # By DQN Nature paper, it is called: phi length
+                                        "axis":0},  # Axis=0 is required when ImageTransposeWrapper is called on the Atari games.
+                                enabled=True))
     # Normalizing observations
     vect_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.VecNormalizeObsDict",
                               args={"paths":[cpanel["observation_key"]],
@@ -212,8 +241,8 @@ def gen_params(cpanel):
     ##################
     params["agents"]["agent"] = {}
     params["agents"]["agent"]["name"] = "agent"
-    params["agents"]["agent"]["type"] = "digideep.agent.sac.Agent"
-    params["agents"]["agent"]["observation_path"] = cpanel["observation_key"]
+    params["agents"]["agent"]["type"] = "dextron.agent.sac.Agent" # "digideep.agent.sac.Agent"
+    params["agents"]["agent"]["observation_path"] = "/camera"     # cpanel["observation_key"]
     params["agents"]["agent"]["methodargs"] = {}
     params["agents"]["agent"]["methodargs"]["n_update"] = cpanel["n_update"]  # Number of times to perform PPO update. Alternative name: PPO_EPOCH
     params["agents"]["agent"]["methodargs"]["gamma"] = cpanel["gamma"]  # Discount factor Gamma
@@ -229,16 +258,20 @@ def gen_params(cpanel):
     demo_batch_size = int(cpanel["demo_use_ratio"] * cpanel["batch_size"])
     train_batch_size  = cpanel["batch_size"] - demo_batch_size
     
-    params["agents"]["agent"]["sampler_list"] = ["dextron.agent.sampler.multi_memory_sample"]
-    params["agents"]["agent"]["sampler_args"] = {"agent_name": params["agents"]["agent"]["name"],
-                                                 "batch_size_dict": {"train":train_batch_size, "demo":demo_batch_size},
-                                                 "observation_path": params["agents"]["agent"]["observation_path"]
+    params["agents"]["agent"]["sampler_list"] = ["dextron.agent.sac.multi_sampler.multi_memory_sample"]
+    params["agents"]["agent"]["sampler_args"] = {"agent_name":params["agents"]["agent"]["name"],
+                                                 "batch_size":cpanel["batch_size"],
+                                                 "scheduler_start":cpanel["scheduler_start"],
+                                                 "scheduler_steps":cpanel["scheduler_steps"],
+                                                 "scheduler_decay":cpanel["scheduler_decay"],
+                                                 "batch_size_dict":{"train":train_batch_size, "demo":demo_batch_size},
+                                                 "observation_path":params["agents"]["agent"]["observation_path"]
                                                 }
 
 #     replay_batch_size = int(cpanel["replay_use_ratio"] * cpanel["batch_size"])
 #     train_batch_size  = cpanel["batch_size"] - replay_batch_size
 #
-#     params["agents"]["agent"]["sampler_list"] = ["dextron.agent.sampler.multi_memory_sample"]
+#     params["agents"]["agent"]["sampler_list"] = ["dextron.agent.sac.multi_sampler.multi_memory_sample"]
 #     params["agents"]["agent"]["sampler_args"] = {"agent_name": params["agents"]["agent"]["name"],
 #                                                  "batch_size_dict": {"train":train_batch_size, "replay":replay_batch_size},
 #                                                  "observation_path": params["agents"]["agent"]["observation_path"]
@@ -252,9 +285,10 @@ def gen_params(cpanel):
     #############
     agent_name = params["agents"]["agent"]["name"]
     observation_path = params["agents"]["agent"]["observation_path"]
-    params["agents"]["agent"]["policyname"] = "digideep.agent.sac.Policy"
+    # params["agents"]["agent"]["policyname"] = "digideep.agent.sac.Policy"
     params["agents"]["agent"]["policyargs"] = {"obs_space": params["env"]["config"]["observation_space"][observation_path],
                                                "act_space": params["env"]["config"]["action_space"][agent_name],
+                                               "image_repr_size": 64,
                                                "hidden_size": 256,
                                                "value_args": {"init_w":0.003},
                                                "softq_args": {"init_w":0.003},
@@ -292,7 +326,7 @@ def gen_params(cpanel):
     ##################
     params["agents"]["demonstrator"] = {}
     params["agents"]["demonstrator"]["name"] = "demonstrator"
-    params["agents"]["demonstrator"]["type"] = "dextron.agent.NaiveController"
+    params["agents"]["demonstrator"]["type"] = "dextron.agent.demonstrator.NaiveController"
     params["agents"]["demonstrator"]["methodargs"] = {}
     agent_name = params["agents"]["demonstrator"]["name"]
     params["agents"]["demonstrator"]["methodargs"]["act_space"] = params["env"]["config"]["action_space"][agent_name]
@@ -305,24 +339,24 @@ def gen_params(cpanel):
     ##############
     params["memory"] = {}
 
+    # TODO: The memory size in chunks should be proportionately distributed. We think that "demo" should have a
+    #       smaller memory size.
+
+    # "digideep.memory.generic.Memory" | "digideep.memory.ringbuffer.Memory"
+    # chunk_sample_len: Number of samples in a chunk
+    # buffer_chunk_len: Number of chunks in the buffer
+
     params["memory"]["train"] = {}
-    # Number of samples in a chunk
-    params["memory"]["train"]["chunk_sample_len"] = cpanel["n_steps"] # params["env"]["config"]["max_episode_steps"]
-    # Number of chunks in the buffer:
-    params["memory"]["train"]["buffer_chunk_len"] = cpanel["memory_size_in_chunks"]
-
-    params["memory"]["demo"] = {}
-    # Number of samples in a chunk
-    params["memory"]["demo"]["chunk_sample_len"] = cpanel["n_steps"] # params["env"]["config"]["max_episode_steps"]
-    # Number of chunks in the buffer:
-    params["memory"]["demo"]["buffer_chunk_len"] = cpanel["memory_size_in_chunks"]
+    params["memory"]["train"]["type"] = "digideep.memory.ringbuffer.Memory"
+    params["memory"]["train"]["args"] = {"chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["memory_size_in_chunks"], "overrun":1}
     
-#     params["memory"]["replay"] = {}
-#     # Number of samples in a chunk
-#     params["memory"]["replay"]["chunk_sample_len"] = cpanel["replay_nsteps"] # params["env"]["config"]["max_episode_steps"]
-#     # Number of chunks in the buffer:
-#     params["memory"]["replay"]["buffer_chunk_len"] = cpanel["memory_size_in_chunks"]
+    params["memory"]["demo"] = {}
+    params["memory"]["demo"]["type"] = "digideep.memory.ringbuffer.Memory"
+    params["memory"]["demo"]["args"] = {"chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["demo_memory_size_in_chunks"], "overrun":1}
 
+    # params["memory"]["replay"] = {}
+    # params["memory"]["replay"]["type"] = "digideep.memory.ringbuffer.Memory"
+    # params["memory"]["replay"]["args"] = {"chunk_sample_len":cpanel["replay_nsteps"], "buffer_chunk_len":cpanel["memory_size_in_chunks"]}
     ##############################################
 
     
@@ -359,7 +393,7 @@ def gen_params(cpanel):
     params["explorer"]["test"]["n_steps"] = None # Do not limit # of steps
     params["explorer"]["test"]["n_episodes"] = cpanel["test_win_size"]
     params["explorer"]["test"]["win_size"] = cpanel["test_win_size"] # Extra episodes won't be counted
-    params["explorer"]["test"]["render"] = True
+    params["explorer"]["test"]["render"] = False
     params["explorer"]["test"]["render_delay"] = 0
     params["explorer"]["test"]["seed"] = cpanel["seed"] + 100 # We want to make the seed of test environments different from training.
     params["explorer"]["test"]["extra_env_kwargs"] = {"mode":params["explorer"]["test"]["mode"], "allow_demos":False}
@@ -392,7 +426,7 @@ def gen_params(cpanel):
     params["explorer"]["demo"]["n_steps"] = cpanel["n_steps"] # Number of steps to take a step in the environment
     params["explorer"]["demo"]["n_episodes"] = None
     params["explorer"]["demo"]["win_size"] = -1
-    params["explorer"]["demo"]["render"] = False # False
+    params["explorer"]["demo"]["render"] = False # True # False
     params["explorer"]["demo"]["render_delay"] = 0
     params["explorer"]["demo"]["seed"] = cpanel["seed"] + 50
     params["explorer"]["demo"]["extra_env_kwargs"] = {"mode":params["explorer"]["demo"]["mode"], "allow_demos":True}

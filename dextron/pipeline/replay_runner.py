@@ -1,7 +1,7 @@
 from digideep.pipeline import Runner
 from digideep.utility.profiling import KeepTime
 from digideep.utility.logging import logger
-import gc
+import gc, time
 
 
 class PlaybackRunner (Runner):
@@ -15,7 +15,6 @@ class PlaybackRunner (Runner):
                         with KeepTime("train"):
                             chunk = self.explorer["train"].update()
                             self.memory["train"].store(chunk)
-                        
                         # 2. Store result of "train"
                         # with KeepTime("store/train"):
                         #     self.memory.store(chunk)
@@ -34,11 +33,12 @@ class PlaybackRunner (Runner):
                         """
                         # 3. Do a demo and store the trajectory
                         with KeepTime("demo"):
-                            self._sync_normalizations(source_explorer="train", target_explorer="demo")
-                            chunk = self.explorer["demo"].update()
-                            self._sync_normalizations(source_explorer="demo", target_explorer="train")
-                            self.memory["demo"].store(chunk)
-
+                            if (self.memory["demo"].full and (self.state["i_cycle"] % 3 == 0)) or (not self.memory["demo"].full):
+                                self._sync_normalizations(source_explorer="train", target_explorer="demo")
+                                chunk = self.explorer["demo"].update()
+                                self._sync_normalizations(source_explorer="demo", target_explorer="train")
+                                self.memory["demo"].store(chunk)
+                            
 
                         """REPLAY MODE
                         Here we do a demonstration, but we do not store the trajectory of the demonstrator.
@@ -71,18 +71,14 @@ class PlaybackRunner (Runner):
                         #     self.memory["replay"].store(chunk)
 
 
-                        
-
-                        
-
                         # 5. Update Agent
                         with KeepTime("update"):
                             for agent_name in self.agents:
                                 with KeepTime(agent_name):
                                     self.agents[agent_name].update()
+
                     self.state["i_cycle"] += 1
                 # End of Cycle
-
                 self.state["i_epoch"] += 1
                 self.monitor_epoch()
                 # NOTE: We may save/test after each cycle or at intervals.

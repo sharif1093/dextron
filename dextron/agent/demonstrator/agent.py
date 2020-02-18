@@ -4,14 +4,15 @@ from copy import deepcopy
 
 from digideep.utility.toolbox import get_class
 from digideep.utility.logging import logger
-from digideep.utility.profiling import KeepTime
+# from digideep.utility.profiling import KeepTime
 from digideep.utility.monitoring import monitor
 
 from digideep.agent.agent_base import AgentBase
 
 
-_DISTANCE_CRITICAL = 0.15
-_OPEN_HAND_CLOSURE = 0.2
+_DISTANCE_CRITICAL = 0.03
+_DISTANCE_NORMALIZED_CRITICAL = 0.15
+_OPEN_HAND_CLOSURE = 0.1
 _CLOSE_HAND_CLOSURE = 0.8
 _GRASPER_GAIN = 2
 
@@ -41,8 +42,8 @@ class NaiveController(AgentBase):
         """
         "hidden_state" should be a dict of lists. It SHOULDN'T be a list of dicts (like "info").
         """
-        h = {"time_step":np.zeros(shape=(num_workers, 1)),
-             "initial_distance":np.ones(shape=(num_workers, 1))}
+        h = {"time_step":np.zeros(shape=(num_workers, 1), dtype=np.float32),
+             "initial_distance":np.ones(shape=(num_workers, 1), dtype=np.float32)}
         return h
 
     # def _lazy_initialization(self, observations):
@@ -59,7 +60,6 @@ class NaiveController(AgentBase):
         """
         num_workers = masks.shape[0]
         # actions = np.zeros(shape=(num_workers, self.action_size))
-        
         actions = []
         for index in range(num_workers):
             # In order to save some milliseconds (!), we only generate actions when environment is in training mode (i.e. imitation learning).
@@ -69,6 +69,8 @@ class NaiveController(AgentBase):
                 actions += [np.zeros(shape=(self.action_size,))]
             else:
                 mask = masks[index]
+
+                # print("@ mask =", mask, ", distance =", observations["/demonstrator/distance"][index])
 
                 if mask == 0: # Environment was reset
                     distance = observations["/demonstrator/distance"][index]
@@ -87,12 +89,13 @@ class NaiveController(AgentBase):
                     distance_normalized = distance / initial_distance
 
                     # Control Law
-                    if distance_normalized >= _DISTANCE_CRITICAL:
-                        # print("Now openning ...")
-                        cmd = _GRASPER_GAIN * (_OPEN_HAND_CLOSURE - hand_closure)
-                    elif distance_normalized < _DISTANCE_CRITICAL:
+                    if (distance_normalized < _DISTANCE_NORMALIZED_CRITICAL) or (distance < _DISTANCE_CRITICAL):
                         # print("Now closing ...")
                         cmd = _GRASPER_GAIN * (_CLOSE_HAND_CLOSURE - hand_closure)
+                    elif distance_normalized >= _DISTANCE_NORMALIZED_CRITICAL:
+                        # print("Now openning ...")
+                        cmd = _GRASPER_GAIN * (_OPEN_HAND_CLOSURE - hand_closure)
+                    
 
                     # Storing action
                     actions += [[cmd]]
@@ -104,7 +107,7 @@ class NaiveController(AgentBase):
         #       The command series @line78 do not consiste with the rest.
         # print("DEMO actions =", actions)
         actions = np.asarray(actions, dtype=np.float32)
-        
+    
         # Check if the action values are within the defined structure, then return.
         # self.params["methodargs"]["act_space"].validate(actions)
 
