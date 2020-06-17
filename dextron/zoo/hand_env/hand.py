@@ -26,6 +26,8 @@ from dm_control.suite import base
 from dm_control.suite.utils import randomizers
 from dm_control.utils import rewards
 
+from dextron.zoo.hand_env.myquaternion import *
+
 
 from dextron.zoo.common import get_model_and_assets_by_name
 
@@ -34,9 +36,8 @@ from .grasp_controllers import GraspControllerIndividualVelocity
 # from .grasp_controllers import GraspControllerAllPosition
 # from .grasp_controllers import GraspControllerAllStep
 
-# Import trajectory generators
-from .trajectory_generator import generate_randomized_simulated_approach
-from .trajectory_generator import generate_sampled_real_trajectory
+from .trajectory_generator import SimulatedTrajectory
+from .trajectory_generator import RealTrajectory
 from .mocap_controller import MocapController
 
 from PIL import Image
@@ -165,12 +166,25 @@ class Hand(base.Task):
 
         # All possible modes: train, test, eval, demo, replay
         self.explorer_mode = self.params.get("mode", "train")
+
+
+        self.environment_kwargs = self.params.get("environment_kwargs")
+        self.generator_args = self.params.get("generator_args")
+        self.generator_type = self.params.get("generator_type")
+        
         self.mode = None
         self.termination = None
         self.episode = 0
         self.counter = 0
 
+
+        self.parameters = collections.OrderedDict()
+        self.infos = collections.OrderedDict()
+
         super(Hand, self).__init__(random=self.params.get("random", None))
+
+
+
 
     def initialize_episode(self, physics):
         """Sets the state of the environment at the start of each episode.
@@ -180,15 +194,20 @@ class Hand(base.Task):
         3. Assign the mocap pos: physics.named.data.mocap_pos["mocap"]
         4. Assign the mocap quat: physics.named.data.mocap_quat["mocap"]
         """
+        # print(dir(physics.named.model))
+        # print(physics.named.model.geom_quat)
+        # exit()
 
+        self.parameters = collections.OrderedDict()
+        self.infos = collections.OrderedDict()
         self.termination = False
         self.episode += 1
 
         if self.allow_demos:
-            print(">>>> TEACHING in explorer [{}].".format(self.explorer_mode))
+            # print(">>>> TEACHING in explorer [{}].".format(self.explorer_mode))
             self.mode = "teaching"
         else:
-            print(">>>> TRAINING in explorer [{}].".format(self.explorer_mode))
+            # print(">>>> TRAINING in explorer [{}].".format(self.explorer_mode))
             self.mode = "training"
         
 
@@ -198,13 +217,19 @@ class Hand(base.Task):
         self.grasper["teaching"] = _GRASP_CONTROLLER_TEACHER(physics)
 
 
-        ## For simulated trajectories:
-        generator = generate_randomized_simulated_approach(self.params["environment_kwargs"], self.params["generator"], )
-
-        # TODO: Randomize the time_limit but not the control_limit.
-        # generator = generate_sampled_real_trajectory(self.params["environment_kwargs"], self.params["generator"], extracts_path="/workspace/extracts")
-        self.mocap_controller = MocapController(generator)
         
+        if self.generator_type == "simulated":
+            trajectory_class = SimulatedTrajectory
+        elif self.generator_type == "real":
+            # TODO: Randomize the time_limit but not the control_limit.
+            # extracts_path = "/workspace/extracts"
+            trajectory_class = RealTrajectory
+        else:
+            raise ValueError("'generator_type' is not valid.")
+        
+        trajectory = trajectory_class(self.environment_kwargs, self.generator_args)
+        generator = trajectory.get_generator_list()
+        self.mocap_controller = MocapController(generator)
         
         ######################################
         ## Initialization of mocap and hand ##
@@ -227,15 +252,33 @@ class Hand(base.Task):
         ## Setting finger initial values ##
         ###################################
         # Start half-closed
-        t = 0.5 # np.random.rand()
-        # t = 0.0 # np.random.rand()
+        # t = 0.5 # np.random.rand()
+        t = np.random.rand()
         physics.named.data.qpos["TPJ"] = -0.57*t #-0.57 0
-        physics.named.data.qpos["IPJ"] = 1.57*t  # 0 1.57
-        physics.named.data.qpos["MPJ"] = 1.57*t  # 0 1.57
-        physics.named.data.qpos["RPJ"] = 1.57*t  # 0 1.57
-        physics.named.data.qpos["PPJ"] = 1.57*t  # 0 1.57
+        physics.named.data.qpos["IPJ"] =  1.57*t # 0 1.57
+        physics.named.data.qpos["MPJ"] =  1.57*t # 0 1.57
+        physics.named.data.qpos["RPJ"] =  1.57*t # 0 1.57
+        physics.named.data.qpos["PPJ"] =  1.57*t # 0 1.57
 
+        # Recording all random parameters
+        self.parameters["initial_closure"] = np.array(t, dtype=np.float32)
+        self.parameters["real_trajectory"] = np.array(self.generator_type == "real", dtype=np.uint8)
+        ####
+        # TODO: We may couple controller_gain and controller_thre. Because if threshold
+        #       is smaller the controller should be faster.
+        # self.parameters["controller_gain"] = 1.00 + np.random.rand() * (5 - 1)     # _GRASPER_GAIN = 2
+        # self.parameters["controller_thre"] = 0.01 + np.random.rand() * (0.25-0.01) # _DISTANCE_NORMALIZED_CRITICAL = 0.15
+        
+        #  TODO: This is temporary. Ideally we have a very fast controller that closes just beside the hand:
+        self.parameters["controller_gain"] = 1.00 + np.random.rand() * (10 - 1)     # _GRASPER_GAIN = 2
+        # Seems to not have any effects!
 
+        self.parameters["controller_thre"] = 0.01 + np.random.rand() * (0.25-0.01)
+        # 0.15 # Should be in the range of 0.05 - 0.25
+
+        # Store "str" data types in the info. Otherwise we will get errors.
+        self.infos["rand"] = trajectory.parameters
+        
         super(Hand, self).initialize_episode(physics)
 
         
@@ -302,6 +345,85 @@ class Hand(base.Task):
         self.mocap_controller.step(physics)
         if self.mocap_controller.termination:
             self.termination = True
+        
+
+
+
+
+        # # TODO: Test the x and m:
+        # #
+        # # NOT PROPAGATED YET!
+        # # x = physics.named.data.mocap_pos["mocap"].copy()
+        # # q = physics.named.data.mocap_quat["mocap"].copy()
+        # #
+        # x = physics.named.data.xpos["mocap"].copy()
+        # q = physics.named.data.xquat["mocap"].copy()
+        # #
+        # x_base = physics.named.data.xpos["base_link"].copy()
+        # q_base = physics.named.data.xquat["base_link"].copy()
+        # #
+        # # x and orientation of palm_center.
+        # xp = physics.named.data.site_xpos["palm_center"].copy()
+        # mp = physics.named.data.site_xmat["palm_center"].copy()
+        # #
+        # # TODO: Goal here: Convert from "mocap" to "palm_center"; so we can do the same in our other file.
+        # # TODO: Convert mp to qp. HOW?
+        # # qw= √(1 + m00 + m11 + m22) /2
+        # # qx = (m21 - m12)/( 4 *qw)
+        # # qy = (m02 - m20)/( 4 *qw)
+        # # qz = (m10 - m01)/( 4 *qw)
+        # #
+        # offset_local = np.array([0, 0.09, 0.03], dtype=np.float64)
+        # # offset_rotated = quatTrans(quatConj(q), offset_local)
+        # offset_rotated = quatTrans(quatConj(q_base), offset_local)
+        # # print("++++++ Difference between palm_center and base:", np.linalg.norm(xp - (x_base + offset_rotated)))
+        # #
+        # #
+        # offset_local_mocap = np.array([0, 0.09+0.015, 0.03], dtype=np.float64)
+        # offset_local_mocap_rotated = quatTrans(quatConj(q), offset_local_mocap)
+        # # print("++++++ Difference between palm_center and mocap:", np.linalg.norm(xp - (x + offset_local_mocap_rotated)))
+        # # print("++++++ Quat diff between palm_center and base:", np.linalg.norm(q-q_base))
+        # # print("")
+        # #
+        # # "xmat" format: [xx, xy, xz, yx, yy, yz, zx, zy, zz]
+        # xmat = physics.named.data.site_xmat["palm_center"]
+        # # print( np.linalg.norm(physics.named.data.xmat["mocap"] - physics.named.data.site_xmat["palm_center"]) )
+        # #
+        # #
+        # normal_to_hand = quatTrans(quatConj(q), np.array([0,0,1]))
+        # #
+        # # This is what we wanted! The third row of the xmat matrix! Also, now we know how to obtain it from q!
+        # # normal_to_hand    =====    [xmat[2],xmat[5],xmat[8]]
+        # # 
+        # print(normal_to_hand)
+        # print(xmat[2],xmat[5],xmat[8])
+        # print()
+        # # 
+        # #
+        # # This is not what we want!!!!!!!!!!!!
+        # # quatTrans(q, np.array([0,0,1]))     =====      xmat[6:9]
+        # #
+        # #
+        # # print(normal_to_hand, xmat[6:9])
+        # # 
+        # # print("")
+        # # 
+        # # print("Z direction:", mp[:3])
+        # #
+        # # We want to know the direction of the b axis of the palm_center coordinate frame.
+        # # b is the local z axis.
+        # # Then, we want to make sure that we can obtain that axis from q.
+        # # 
+        # # print("palm_center matrix:", sum(mp[:3] * mp[3:6]), sum(mp[3:6] * mp[6:9]))
+        # #
+        # # xpos and size_xpos are in global coordinates. We should take care of this fact.
+        # # 
+        # # ----
+        # # pos_offset_local  = np.array([0, 0, -0.025], dtype=np.float64)
+        # # pos_offset_global = quatTrans(quatConj(q), pos_offset_local)
+        # #
+        # # Find the palm_center by coordinate transformations. Then check it versus the palm_center that we get from the following:
+        
 
 
 
@@ -350,6 +472,11 @@ class Hand(base.Task):
         # render(height=240, width=320, camera_id=-1, overlays=(), depth=False, segmentation=False, scene_option=None)
         if self.pub_cameras:
             obs["camera"] = physics.rgb2gray(physics.render(width=60*4, height=60*3, camera_id="fixed")).astype(np.uint8)
+            
+            # image, depth = physics.render(width=60*4, height=60*3, camera_id="fixed", depth=True)
+            # obs["camera"] = physics.rgb2gray(image).astype(np.uint8)
+            # obs["depth"]  = depth
+
         # print(obs["camera"].shape)
         # (256, 4, 84, 84)
 
@@ -398,12 +525,23 @@ class Hand(base.Task):
         obs['status'] = collections.OrderedDict()
         is_training = 1 if self.mode == "training" else 0
         obs['status']['is_training'] = np.array(is_training, dtype=np.uint8)
+
+        # The following also works for parameters:
+        # obs['status']['parameters'] = self.parameters
         # obs['status']['time'] = np.array(physics.time())
+        
+        #############################
+        ### parameters ###
+        ##################
+        obs['parameters'] = self.parameters
 
         #############################
         ### info ###
         ############
+        # info has already been initialized in constructor and initial_episode.
         # obs['info'] = collections.OrderedDict()
+        obs['info'] = self.infos
+        # obs['info']['param1'] = np.array(1, dtype=np.float32)
 
         return obs
 
@@ -413,7 +551,7 @@ class Hand(base.Task):
 
 
         # tolerance(x, bounds=(0.0, 0.0), margin=0.0, sigmoid='gaussian', value_at_margin=0.1):
-        height_object = rewards.tolerance(height, bounds=(0.25,np.inf), margin=0)
+        height_object = rewards.tolerance(height, bounds=(0.25, np.inf), margin=0)
         # height_object = (1 + height_object)/2
 
         reward = height_object
@@ -432,7 +570,7 @@ class Hand(base.Task):
     def get_termination(self, physics):
         """Terminates when the we are not good."""
         height = physics.named.data.xipos['long_cylinder', 'z']
-        if self.termination or (height < 0.120):
+        if self.termination or (height < 0.110):
             # `self.termination` is a class-level flag to indicate
             # the moment for termination.
             return 0.0

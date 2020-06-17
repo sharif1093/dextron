@@ -16,7 +16,7 @@ from digideep.environment.dmc2gym.registration import EnvCreator
 from dextron.zoo.hand_env.hand import grasp
 from gym.envs.registration import register
 
-
+# print(">>>>>>>>>>>>>>>>> zoo.__init__ is now LOADED")
 
 _CONTROL_TIMESTEP = .02 # (Seconds)
 _DEFAULT_TIME_LIMIT = 6 # Default duration of an episode, in seconds.
@@ -24,9 +24,11 @@ _DEFAULT_TIME_SCALE_OFFSET = 0.5 # 1.0
 _DEFAULT_TIME_SCALE_FACTOR = 1.5 # 2.0
 _DEFAULT_TIME_NOISE_FACTOR = 0.2
 
-task_kwargs = {"generator":{"time_scale_offset":_DEFAULT_TIME_SCALE_OFFSET,
-                            "time_scale_factor":_DEFAULT_TIME_SCALE_FACTOR,
-                            "time_noise_factor":_DEFAULT_TIME_NOISE_FACTOR},
+task_kwargs = {"generator_type":"real",
+               "generator_args":{"time_scale_offset":_DEFAULT_TIME_SCALE_OFFSET,
+                                 "time_scale_factor":_DEFAULT_TIME_SCALE_FACTOR,
+                                 "time_noise_factor":_DEFAULT_TIME_NOISE_FACTOR,
+                                 "extracts_path":"/workspace/extracts"},
                "random":None,}
 
 environment_kwargs = {"time_limit":_DEFAULT_TIME_LIMIT, "control_timestep":_CONTROL_TIMESTEP}
