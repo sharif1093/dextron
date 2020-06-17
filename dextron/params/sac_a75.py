@@ -59,15 +59,16 @@ cpanel["scheduler_steps"] = cpanel["epoch_size"] * 100
 cpanel["scheduler_decay"] = 1.0 # Never reduce!
 # cpanel["scheduler_decay"] = .95
 # Using combined experience replay (CER) in the sampler.
-cpanel["use_cer"] = True
+cpanel["use_cer"] = False
 
 cpanel["seed"] = 0
 cpanel["cuda_deterministic"] = False # With TRUE we MIGHT get more deterministic results but at the cost of speed.
 
 #####################
 ### Memory Parameters
-cpanel["memory_size_in_chunks"] = int(1e5)      # SHOULD be 1 for on-policy methods that do not have a replay buffer.
-cpanel["demo_memory_size_in_chunks"] = int(1e5) # SHOULD be 1 for on-policy methods that do not have a replay buffer.
+cpanel["memory_size_in_chunks"] = int(1e5)
+cpanel["demo_memory_size_in_chunks"] = int(1e5)
+# SHOULD be 1 for on-policy methods that do not have a replay buffer.
 # SUGGESTIONS: 2^0 (~1e0) | 2^3 (~1e1) | 2^7 (~1e2) | 2^10 (~1e3) | 2^13 (~1e4) | 2^17 (1e5) | 2^20 (~1e6)
 
 ##########################
@@ -81,6 +82,7 @@ else:
 
 cpanel["from_params"] = True
 # Environment parameters
+cpanel["generator_type"] = "simulated"
 cpanel["time_limit"] = 10.0 # Set the maximum time here!
 cpanel["time_scale_offset"] = 0.5 # 1.0
 cpanel["time_scale_factor"] = 1.5 # 2.0
@@ -152,9 +154,11 @@ def gen_params(cpanel):
         from digideep.environment.dmc2gym.registration import EnvCreator
         from dextron.zoo.hand_env.hand import grasp
 
-        task_kwargs = {"generator":{"time_scale_offset":cpanel["time_scale_offset"],
-                                    "time_scale_factor":cpanel["time_scale_factor"],
-                                    "time_noise_factor":cpanel["time_noise_factor"]},
+        task_kwargs = {"generator_type":cpanel["generator_type"], # Algorithm for generating trajectory: simulated/real
+                       "generator_args":{"time_scale_offset":cpanel["time_scale_offset"],
+                                         "time_scale_factor":cpanel["time_scale_factor"],
+                                         "time_noise_factor":cpanel["time_noise_factor"],
+                                         "extracts_path":"/workspace/extracts"},
                        "random":None,
                        "pub_cameras":PUB_CAMERAS} # "teaching_rate":cpanel["teaching_rate"]
         

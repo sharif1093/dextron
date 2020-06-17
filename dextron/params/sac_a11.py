@@ -57,8 +57,9 @@ cpanel["cuda_deterministic"] = False # With TRUE we MIGHT get more deterministic
 
 #####################
 ### Memory Parameters
-cpanel["memory_size_in_chunks"] = int(1e5)      # SHOULD be 1 for on-policy methods that do not have a replay buffer.
-cpanel["demo_memory_size_in_chunks"] = int(1e5) # SHOULD be 1 for on-policy methods that do not have a replay buffer.
+cpanel["memory_size_in_chunks"] = int(1e5)
+cpanel["demo_memory_size_in_chunks"] = int(1e5)
+# SHOULD be 1 for on-policy methods that do not have a replay buffer.
 # SUGGESTIONS: 2^0 (~1e0) | 2^3 (~1e1) | 2^7 (~1e2) | 2^10 (~1e3) | 2^13 (~1e4) | 2^17 (1e5) | 2^20 (~1e6)
 
 ##########################

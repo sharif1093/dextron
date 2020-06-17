@@ -9,9 +9,9 @@
            * OR CONDITIONALIZE USING/LOADING TEXTURES/MATERIALS ON A VARIABLE!
      -->
     
-    <visual>
+    <!-- <visual>
         <global offwidth="960" offheight="720"/>
-    </visual>
+    </visual> -->
 
     <compiler angle="radian" meshdir="mesh/bb_left_hand/" texturedir="texture/"/>
     <!-- "option" tag is taken from MPL.xml hand -->
@@ -28,7 +28,8 @@
         	<joint limited="true" damping="0.2" armature=".01"/>
         	<site type="ellipsoid" group="3"/> <!-- material="MatTouch" -->
             <position ctrllimited="true" kp="10"/>
-            <velocity ctrllimited="true" kv="50"/>
+            <!-- <velocity ctrllimited="true" ctrlrange="-10 10" forcelimited="true" forcerange="-10 10" kv="100"/> -->
+            <velocity ctrllimited="true" ctrlrange="-1 1" forcelimited="true" forcerange="-1 1" kv="50"/>
 		</default>
     </default>
 
@@ -315,7 +316,8 @@
 	
 	
 	<equality>
-        <weld body1="mocap" body2="base_link" solref="0.01 1" solimp=".9 .9 0.01"/>
+        <weld body1="mocap" body2="base_link" solref="0.001 1" solimp=".9 .9 0.01"/>
+        <!-- <weld body1="mocap" body2="base_link" solref="0.01 1" solimp=".9 .9 0.01"/> -->
         <!-- <connect body1="mocap" body2="base_link" anchor="0 0 0" solref="0.02 1" solimp="0.9 0.95 0.001" /> -->
 
 		<!-- Proximal-Distal Couplings -->
@@ -357,11 +359,11 @@
     <!-- ctrlrange in velocity actuators is of dimension of velocity. -->
     <actuator>
         <position name="A_thumb_C"         class="Generic" joint="TCJ"  ctrlrange=" 0 1.05"/>
-        <velocity name="A_thumb_proximal"  class="Generic" joint="TPJ"  ctrlrange="-1 1" forcerange="-2 2" forcelimited="true" gear="-1 0 0 0 0 0"/>
-		<velocity name="A_index_proximal"  class="Generic" joint="IPJ"  ctrlrange="-1 1" forcerange="-1 1" forcelimited="true" />
-		<velocity name="A_middle_proximal" class="Generic" joint="MPJ"  ctrlrange="-1 1" forcerange="-1 1" forcelimited="true" />
-		<velocity name="A_ring_proximal"   class="Generic" joint="RPJ"  ctrlrange="-1 1" forcerange="-1 1" forcelimited="true" />
-        <velocity name="A_pinky_proximal"  class="Generic" joint="PPJ"  ctrlrange="-1 1" forcerange="-1 1" forcelimited="true" />
+        <velocity name="A_thumb_proximal"  class="Generic" joint="TPJ"  forcerange="-2 2" gear="-1 0 0 0 0 0"/>
+		<velocity name="A_index_proximal"  class="Generic" joint="IPJ" />
+		<velocity name="A_middle_proximal" class="Generic" joint="MPJ" />
+		<velocity name="A_ring_proximal"   class="Generic" joint="RPJ" />
+        <velocity name="A_pinky_proximal"  class="Generic" joint="PPJ" />
 	</actuator>
 
     <!-- <actuator>
