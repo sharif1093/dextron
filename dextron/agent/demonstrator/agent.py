@@ -11,10 +11,10 @@ from digideep.agent.agent_base import AgentBase
 
 
 _DISTANCE_CRITICAL = 0.03
-_DISTANCE_NORMALIZED_CRITICAL = 0.15
-_OPEN_HAND_CLOSURE = 0.1
+_OPEN_HAND_CLOSURE = 0.0
 _CLOSE_HAND_CLOSURE = 0.8
-_GRASPER_GAIN = 2
+# _DISTANCE_NORMALIZED_CRITICAL = 0.15
+# _GRASPER_GAIN = 2
 
 
 class NaiveController(AgentBase):
@@ -30,6 +30,8 @@ class NaiveController(AgentBase):
         # state_size  = self.params["obs_space"]["dim"][0]
         self.action_size = act_space["dim"] if np.isscalar(act_space["dim"]) else act_space["dim"][0]
 
+        
+
     ###############
     ## SAVE/LOAD ##
     ###############
@@ -43,7 +45,9 @@ class NaiveController(AgentBase):
         "hidden_state" should be a dict of lists. It SHOULDN'T be a list of dicts (like "info").
         """
         h = {"time_step":np.zeros(shape=(num_workers, 1), dtype=np.float32),
-             "initial_distance":np.ones(shape=(num_workers, 1), dtype=np.float32)}
+             "initial_distance":np.ones(shape=(num_workers, 1), dtype=np.float32),
+             "controller_gain":np.ones(shape=(num_workers, 1), dtype=np.float32),
+             "controller_thre":np.ones(shape=(num_workers, 1), dtype=np.float32)}
         return h
 
     # def _lazy_initialization(self, observations):
@@ -73,8 +77,12 @@ class NaiveController(AgentBase):
                 # print("@ mask =", mask, ", distance =", observations["/demonstrator/distance"][index])
 
                 if mask == 0: # Environment was reset
+                    # TODO: Read all random parameters from here. DO NOT GENERATE random parameters in this class.
+                    hidden_state["controller_gain"][index] = observations["/parameters/controller_gain"][index]
+                    hidden_state["controller_thre"][index] = observations["/parameters/controller_thre"][index]
+
                     distance = observations["/demonstrator/distance"][index]
-                    print("Found a reset signal. Saving initial states. Distance = ", distance)
+                    # print("Found a reset signal. Saving initial states. Distance = ", distance)
                     hidden_state["initial_distance"][index] = distance
                     hidden_state["time_step"][index] = 0
                     actions += [np.zeros(shape=(self.action_size,))]
@@ -83,6 +91,10 @@ class NaiveController(AgentBase):
                     # Values
                     initial_distance = hidden_state["initial_distance"][index]
                     time_step = hidden_state["time_step"][index]
+
+                    _GRASPER_GAIN = hidden_state["controller_gain"][index]
+                    _DISTANCE_NORMALIZED_CRITICAL = hidden_state["controller_thre"][index]
+
                     distance = observations["/demonstrator/distance"][index]
                     hand_closure = observations["/demonstrator/hand_closure"][index]
                     # Pre-calculations
