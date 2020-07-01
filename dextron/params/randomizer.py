@@ -39,7 +39,7 @@ cpanel = OrderedDict()
 ### Runner Parameters
 # num_frames = 10e6  # Number of frames to train
 cpanel["runner_name"]   = "dextron.pipeline.random_runner.RandomRunner"
-cpanel["number_epochs"] = 1000  # epochs
+cpanel["number_epochs"] = 15000  # epochs
 cpanel["epoch_size"]    = 1000  # cycles
 cpanel["test_activate"] = False # Test Activate
 cpanel["test_interval"] = 10    # Test Interval Every #n Epochs
@@ -67,12 +67,25 @@ else:
     cpanel["observation_key"] = "/agent"
 
 cpanel["from_params"] = True
+
 # Environment parameters
+# cpanel["database_filename"] = "/tmp/digideep_sessions_old/session_20200618092219_adoring_chebyshev/monitor.csv"
+# cpanel["database_filename"] = "/tmp/digideep_sessions_old/session_20200621184047_elegant_chebyshev/monitor.csv"
+# cpanel["database_filename"] = "/tmp/digideep_sessions/session_20200621220442_quizzical_jang/monitor.csv"
+# cpanel["database_filename"] = "/tmp/digideep_sessions/session_20200622142647_exciting_franklin/monitor.csv"
+
+# cpanel["database_filename"] = "/tmp/digideep_sessions_old/session_20200622180024_affectionate_goodall/monitor.csv"
+cpanel["database_filename"] = None
+
+
+cpanel["extracts_path"] = "./workspace/extracts"
+# cpanel["extracts_path"] = "/workspace/extracts"
 cpanel["generator_type"] = "real" # "simulated" # "real"
 cpanel["time_limit"] = 10.0 # Set the maximum time here!
 cpanel["time_scale_offset"] = 0.5 # 1.0
-cpanel["time_scale_factor"] = 1.5 # 2.0
+cpanel["time_scale_factor"] = 2.5 # 2.0
 cpanel["time_noise_factor"] = 0.8
+cpanel["reward_threshold"] = 1.0
 
 cpanel["gamma"] = 0.99     # The gamma parameter used in VecNormalize | Agent.preprocess | Agent.step
 
@@ -104,7 +117,8 @@ def gen_params(cpanel):
                        "generator_args":{"time_scale_offset":cpanel["time_scale_offset"],
                                          "time_scale_factor":cpanel["time_scale_factor"],
                                          "time_noise_factor":cpanel["time_noise_factor"],
-                                         "extracts_path":"/workspace/extracts"},
+                                         "extracts_path":cpanel["extracts_path"],
+                                         "database_filename":cpanel["database_filename"]},
                        "random":None,
                        "pub_cameras":PUB_CAMERAS}
         
@@ -153,8 +167,8 @@ def gen_params(cpanel):
 
     # Log successful parameter sets for the expert policy
     vect_wrappers.append(dict(name="dextron.wrappers.success_logger.VecSuccessLogger",
-                              args={"filename":"/workspace/",
-                                    "threshold": 1.0, # Remove only zero-rewards
+                              request_for_args=["session"],
+                              args={"threshold": cpanel["reward_threshold"], # Remove only zero-rewards
                                     "interval": 100, # How many episodes to print the log report?
                                     "num_workers": cpanel["num_workers"],
                                     "info_keys": ["/rand"],
