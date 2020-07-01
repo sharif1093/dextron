@@ -108,7 +108,7 @@ class NaiveController(AgentBase):
                         # print("Now openning ...")
                         cmd = _GRASPER_GAIN * (_OPEN_HAND_CLOSURE - hand_closure)
                     
-
+                    cmd = float(cmd)
                     # Storing action
                     actions += [[cmd]]
                     ## actions += [[cmd]*5] # Use when you are giving actions for all fingers to the agent.
