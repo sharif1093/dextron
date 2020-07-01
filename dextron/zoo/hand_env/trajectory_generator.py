@@ -1,5 +1,4 @@
 import os, glob
-import random
 import json
 import numpy as np
 import numpy.matlib as npm
@@ -13,9 +12,10 @@ from dextron.zoo.hand_env.myquaternion import *
 ### Trajectory Class ###
 ########################
 class Trajectory:
-    def __init__(self, environment_kwargs, generator_kwargs):
+    def __init__(self, environment_kwargs, generator_kwargs, random_params={}):
         self.environment_kwargs = environment_kwargs
         self.generator_kwargs = generator_kwargs
+        self.random_params = random_params
         self.parameters = {}
         self.initialize()
 
@@ -108,12 +108,9 @@ class RealTrajectory(Trajectory):
         #################################
         ### Sample a file name ###
         ##########################
-        extracts_path_jsons = os.path.join(extracts_path, "*.json")
-        all_samples = sorted(glob.glob(extracts_path_jsons))
-        filename = random.choice(all_samples) # uniformly sampled
         # Based on the file name, we know from what region the trajectory starts.
-        base_filename, _ = os.path.splitext(os.path.basename(filename))
-
+        base_filename = self.random_params["filename"]
+        filename = os.path.join(extracts_path, base_filename+".json")
         metafile = os.path.join(extracts_path, "meta", base_filename+"_meta.json")
         
         # Read the trajectory data from file
@@ -124,24 +121,35 @@ class RealTrajectory(Trajectory):
         ### Process the trajectory ###
         ##############################
         # Randomize the trajectory duration (T)
-        original_time = t[-1]
-        noise = original_time + np.random.normal(scale=time_noise_factor)
-        T = original_time * time_scale_factor + time_scale_offset + noise
+        if "original_time" in self.random_params:
+            original_time = self.random_params["original_time"]
+            # T = float(self.random_params["randomized_time"].strip("[]"))
+            T = self.random_params["randomized_time"]
+        else:
+            time_noise_normal = self.random_params["time_noise_normal"]
+            original_time = t[-1]
+            noise = time_noise_normal * time_noise_factor
+            T = original_time * (time_scale_factor) + (time_scale_offset + noise)
 
+        # print("ori:", original_time, "| random:", T)
         # Scale the t vector with respect to the trajectory time
         t_scaled = t * T / original_time
         t_vector = np.arange(0, T+1e-5, control_timestep)
         t_vector = t_vector[t_vector<=T] # Make sure that we do not go beyond the T.
+
         
         # 1. Fitting a spline curve on the x:
         try:
             x_spline, _ = splprep(x.T, u=t_scaled, s=0)
             x_vector = np.array([splev(t_vector[i], x_spline, ext=3) for i in range(len(t_vector))], dtype=np.float)
-        except:
+        except Exception as e:
             print("Got an error with {} file while interpolating.".format(base_filename))
-            exit()
+            print(e)
+            # t, v, tb = sys.exc_info()
+            # raise t, v, tb
+            raise e
             
-        
+
         # 2. Fitting to quaternion arrays
         qs = quaternion.as_quat_array(q)
         q_vector = quaternion.as_float_array(quaternion.squad(qs, t_scaled, t_vector))
@@ -188,9 +196,7 @@ class RealTrajectory(Trajectory):
         
         # TODO: This offset is something that needs to be randomized.
         # offset_noise_2d = np.array([-0.02, -0.01, 0], dtype = np.float64)
-        offset_noise_x = -0.03 + np.random.rand() * (0.03 - (-0.03))
-        offset_noise_y = -0.03 + np.random.rand() * (0.03 - (-0.03))
-        offset_noise_2d = np.array([offset_noise_x, offset_noise_y, 0], dtype = np.float64)
+        offset_noise_2d = self.random_params["offset_noise_2d"]
         
         x_vector = x_vector - x_palm_center_reached + offset_noise_2d
 
@@ -258,10 +264,9 @@ class RealTrajectory(Trajectory):
 
         # print(f"Selected file: {base_filename} | Total time: {T} | dt: {control_timestep}")
 
-        #################################
-        ### Storing values
-        self.parameters["filename"] = base_filename
-        
+        #####################################
+        ### Storing Additional Parameters ###
+        #####################################
         # Extract useful information from the sampled file name
         # subject_id, starting_flag, starting_id = base_filename.split("_")
         # self.parameters["subject_id"] = subject_id
@@ -270,9 +275,6 @@ class RealTrajectory(Trajectory):
         ##
         self.parameters["original_time"] = original_time
         self.parameters["randomized_time"] = T
-
-
-        self.parameters["offset_noise_2d"] = offset_noise_2d
         #################################
     
     def generate(self):
@@ -302,24 +304,17 @@ class SimulatedTrajectory(Trajectory):
     def initialize(self):
         time_limit = self.environment_kwargs["time_limit"]
         
+        ## Start point
         ## Randomizing initial position x&y on a quadcircle:
-
-        # theta = np.random.rand() * np.pi/7 + np.pi/7
-        theta = np.random.rand() * np.pi/14 + np.pi/14
+        r = self.random_params["radius"]
+        theta = self.random_params["theta"]
         
-        # NOTE: Don't start too close, give the agent some time.
-        r = np.random.rand() * 0.35 + 0.25
+        ## Approach point
+        ex = self.random_params["ex"]
+        ey = self.random_params["ey"]
+        ez = self.random_params["ez"]
+
         start_point = np.array([-r * np.sin(theta), -r * np.cos(theta), 0.1], dtype=np.float32)
-        
-        ## PREVIOUSLY USED TO BE:
-        ex = -0.045 # + 0.020 * (2*np.random.rand()-1)
-        ey = -0.10
-
-        # ex = -0.05  + 0.020 * (2*np.random.rand()-1)
-        # ey = -0.095 + 0.020 * (2*np.random.rand()-1)
-
-        ez = 0.10 + 0.020 * (2*np.random.rand()-1)
-
         approach_point = np.array([ex,  ey,  ez], dtype=np.float32)
         top_point = approach_point + np.array([0.00,  0.00,  0.2], dtype=np.float32)
 
@@ -329,7 +324,6 @@ class SimulatedTrajectory(Trajectory):
         self.points.append(top_point)
 
         self.times = [time_limit/2, time_limit/3]
-
 
         #################################
         ### Storing values
