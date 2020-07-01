@@ -9,14 +9,27 @@ from dextron.wrappers.graph import Scatter
 
 from digideep.pipeline.session import writers
 
+from copy import deepcopy
+
 class VecSuccessLogger(VecEnvWrapper):
-    def __init__(self, venv, mode, filename=None, threshold=0., interval=100, info_keys=["/rand"], obs_keys=["/parameters"], num_workers=None):
+    def __init__(self, venv, mode, session, threshold=0., interval=100, info_keys=["/rand"], obs_keys=["/parameters"], num_workers=None):
         VecEnvWrapper.__init__(self, venv)
+        self.session = session
+        
         self.eprets = None
         self.eplens = None
         self.tstart = time.time()
 
-        self.filename = filename
+        # Observations are one step old, so should be the infos!
+        self.infos = None
+        self.obs = None
+
+        if self.session:
+            self.filename = self.session.state['path_session']
+        else:
+            self.filename = ""
+
+        
         self.results_writer = None
         self.num_workers = num_workers
 
@@ -128,6 +141,7 @@ class VecSuccessLogger(VecEnvWrapper):
 
             self.results_writer = ResultsWriter(self.filename, header={'t_start': self.tstart}, extra_keys=extra_keys)
 
+        # print("obs termination:", obs[0][])
         # print()
         # print(rews)
         # print("rews.shape:", rews.shape)
@@ -145,8 +159,10 @@ class VecSuccessLogger(VecEnvWrapper):
 
                 epinfo = {'r': ret[0], 'l': eplen, 't': time.time() - self.tstart, '/worker': i}
                 
+                # Using infos that are one step old, just to be like the observations.
+                # self.add_keys(epinfo, self.infos, i, self.key_root_infos)
                 self.add_keys(epinfo, infos, i, self.key_root_infos)
-                self.add_keys(epinfo, obs, i, self.key_root_obs)
+                self.add_keys(epinfo, self.obs, i, self.key_root_obs)
 
                 
                 self.stats["episodes"] += 1
@@ -158,7 +174,9 @@ class VecSuccessLogger(VecEnvWrapper):
                     self.stats["episodes_failure"] += 1
                 else:
                     self.results_writer.write_row(epinfo)
-                    # print("success case")
+                    # print("+++++++++++++++ success case recorded +++++++++++++++")
+                    # print(epinfo)
+                    # print()
                 
                 self.update_graph(epinfo, success)
                 
@@ -169,7 +187,9 @@ class VecSuccessLogger(VecEnvWrapper):
                 # Acts by reference!
                 self.eprets[i] = 0
                 self.eplens[i] = 0
-
+        
+        # self.infos = deepcopy(infos)
+        self.obs = obs
         return obs, rews, dones, infos
 
     def log(self):
