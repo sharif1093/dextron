@@ -59,7 +59,7 @@ cpanel["scheduler_steps"] = cpanel["epoch_size"] * 100
 cpanel["scheduler_decay"] = 1.0 # Never reduce!
 # cpanel["scheduler_decay"] = .95
 # Using combined experience replay (CER) in the sampler.
-cpanel["use_cer"] = True
+cpanel["use_cer"] = False # This did not prove useful at all!
 
 cpanel["seed"] = 0
 cpanel["cuda_deterministic"] = False # With TRUE we MIGHT get more deterministic results but at the cost of speed.
@@ -77,10 +77,18 @@ cpanel["observation_key"] = "/agent"
 cpanel["from_params"] = True
 
 # Environment parameters
+
+cpanel["database_filename"] = "/workspace/parameters/session_20200622201351_youthful_pascal.csv"
+
+# cpanel["extracts_path"] = "./workspace/extracts"
+cpanel["extracts_path"] = "/workspace/extracts"
+
+cpanel["generator_type"] = "real" # "simulated" # "real"
 cpanel["time_limit"] = 10.0 # Set the maximum time here!
 cpanel["time_scale_offset"] = 0.5 # 1.0
-cpanel["time_scale_factor"] = 1.5 # 2.0
-cpanel["time_noise_factor"] = 0.2
+cpanel["time_scale_factor"] = 2.5 # 2.0
+cpanel["time_noise_factor"] = 0.8
+cpanel["reward_threshold"] = 1.0
 cpanel["exclude_obs"] = []
 
 cpanel["gamma"] = 0.99     # The gamma parameter used in VecNormalize | Agent.preprocess | Agent.step
@@ -102,6 +110,7 @@ cpanel["gamma"] = 0.99     # The gamma parameter used in VecNormalize | Agent.pr
 ### Exploration (~ num_workers * n_steps)
 cpanel["num_workers"] = 1     # From Explorer           # Number of exploratory workers working together
 cpanel["n_steps"] = 1         # From Explorer           # Number of frames to produce
+cpanel["render"] = False # In the test
 ### Exploitation (~ n_update * batch_size)
 cpanel["n_update"] = 1        # From Agents: Updates per step
 cpanel["batch_size"] = 32     # From Agents
@@ -146,13 +155,21 @@ def gen_params(cpanel):
         from digideep.environment.dmc2gym.registration import EnvCreator
         from dextron.zoo.hand_env.hand import grasp
 
-        task_kwargs = {"generator":{"time_scale_offset":cpanel["time_scale_offset"],
-                                    "time_scale_factor":cpanel["time_scale_factor"],
-                                    "time_noise_factor":cpanel["time_noise_factor"]},
+        task_kwargs = {"generator_type":cpanel["generator_type"], # Algorithm for generating trajectory: simulated/real
+                       "generator_args":{"time_scale_offset":cpanel["time_scale_offset"],
+                                         "time_scale_factor":cpanel["time_scale_factor"],
+                                         "time_noise_factor":cpanel["time_noise_factor"],
+                                         "extracts_path":cpanel["extracts_path"],
+                                         "database_filename":cpanel["database_filename"]},
                        "random":None,
-                       "pub_cameras":PUB_CAMERAS,
-                       "exclude_obs":cpanel["exclude_obs"]} # "teaching_rate":cpanel["teaching_rate"]
-        
+                       "pub_cameras":PUB_CAMERAS}
+
+        # task_kwargs = {"generator":{"time_scale_offset":cpanel["time_scale_offset"],
+        #                             "time_scale_factor":cpanel["time_scale_factor"],
+        #                             "time_noise_factor":cpanel["time_noise_factor"]},
+        #                "random":None,
+        #                "pub_cameras":PUB_CAMERAS,
+        #                "exclude_obs":cpanel["exclude_obs"]} # "teaching_rate":cpanel["teaching_rate"]
         # visualize_reward=True
         environment_kwargs = {"time_limit":cpanel["time_limit"], "control_timestep":0.02}
         params["env"]["register_args"] = {"id":cpanel["model_name"],
@@ -425,7 +442,7 @@ def gen_params(cpanel):
     params["explorer"]["demo"]["n_steps"] = cpanel["n_steps"] # Number of steps to take a step in the environment
     params["explorer"]["demo"]["n_episodes"] = None
     params["explorer"]["demo"]["win_size"] = -1
-    params["explorer"]["demo"]["render"] = False # True # False
+    params["explorer"]["demo"]["render"] = cpanel["render"]
     params["explorer"]["demo"]["render_delay"] = 0
     params["explorer"]["demo"]["seed"] = cpanel["seed"] + 50
     params["explorer"]["demo"]["extra_env_kwargs"] = {"mode":params["explorer"]["demo"]["mode"], "allow_demos":True}
