@@ -7,9 +7,6 @@ todo:
       * Calculate complex states in the upstream physics instance.
 """
 
-
-
-
 # Are we in python2?
 from __future__ import absolute_import
 from __future__ import division
@@ -17,7 +14,10 @@ from __future__ import print_function
 
 import collections
 import numpy as np
-import sys
+import pandas as pd
+import sys, os, glob
+import random
+import json
 
 from dm_control import mujoco
 from dm_control.rl import control
@@ -171,9 +171,10 @@ class Hand(base.Task):
         self.environment_kwargs = self.params.get("environment_kwargs")
         self.generator_args = self.params.get("generator_args")
         self.generator_type = self.params.get("generator_type")
+
         
         self.mode = None
-        self.termination = None
+        self.termination = False
         self.episode = 0
         self.counter = 0
 
@@ -182,6 +183,118 @@ class Hand(base.Task):
         self.infos = collections.OrderedDict()
 
         super(Hand, self).__init__(random=self.params.get("random", None))
+
+
+
+
+
+    def sampler(self):
+        """
+        In this module, we either
+            - randomly sample the set of parameters from a uniform distribution,
+            - or we sample them from a given CSV file.
+        """
+        filename = self.generator_args.get("database_filename", None)
+
+        if filename:
+            data = pd.read_csv(filename, low_memory=False, header=1)
+            entry = data.sample(n=1, replace=True)
+            # entry = data.loc[[1]]
+            # print(entry)
+            entry = entry.to_dict('records')[0]
+            # entry["/parameters/controller_gain"] = 2.2506406414265157
+            # entry["/parameters/controller_thre"] = 0.036953724073228306
+
+            # '/rand/offset_noise_2d'
+
+            params = collections.OrderedDict()
+            params["parameters"] = collections.OrderedDict()
+            params["rand"] = collections.OrderedDict()
+
+            for k in entry:
+                if k.startswith("/parameters/"):
+                    k_ = k[len("/parameters/"):]
+                    params["parameters"][k_] = entry[k]
+
+                if k.startswith("/rand/"):
+                    k_ = k[len("/rand/"):]
+                    params["rand"][k_] = entry[k]
+                
+            # print(params["parameters"].keys())
+            # Modifying some keys.
+            # '/rand/offset_noise_2d'
+            arr = params["rand"]["offset_noise_2d"].strip(' []').split()
+            params["rand"]["offset_noise_2d"] = [float(a) for a in arr]
+
+            # # '/rand/original_time', '/rand/randomized_time'
+            # time_scale_offset = self.generator_args["time_scale_offset"]
+            # time_scale_factor = self.generator_args["time_scale_factor"]
+            # time_noise_factor = self.generator_args["time_noise_factor"]
+            # T = params["rand"]["randomized_time"]
+            # original_time = params["rand"]["original_time"]
+            # # Calculations
+            # noise = T - original_time * (time_scale_factor) + time_scale_offset
+            # time_noise_normal = noise / time_noise_factor
+            # params["rand"]["time_noise_normal"] = time_noise_normal
+            print("Loading from worker {} with r={}".format(entry["/worker"], entry["r"]))
+            return params
+        
+        params = collections.OrderedDict()
+        ############################################################################
+        ## Setting up parameters: Those that will be stored in the "observations" ##
+        params["parameters"] = collections.OrderedDict()
+
+        # Recording all random parameters
+        # Start half-closed
+        # t = 0.5
+        params["parameters"]["initial_closure"] = np.random.rand()
+        # np.random.rand(1).astype(np.float32)
+        # TODO: We may couple controller_gain and controller_thre. Because if threshold
+        #       is smaller the controller should be faster.
+        params["parameters"]["controller_gain"] = 1.00 + np.random.rand() * (10 - 1)     # _GRASPER_GAIN = 2
+        params["parameters"]["controller_thre"] = 0.01 + np.random.rand() * (0.50-0.01)
+        
+
+        ##################################################################
+        ## Setting up randoms: Those that will be stored in the "infos" ##
+        # "str" data types can only be stored in the infos, not obs.
+        params["rand"] = collections.OrderedDict()
+
+        if self.generator_type == "real":
+            # self.environment_kwargs, self.generator_args
+
+            # ### Storing values
+            extracts_path = self.generator_args["extracts_path"]
+            extracts_path_jsons = os.path.join(extracts_path, "*.json")
+            all_samples = sorted(glob.glob(extracts_path_jsons))
+            filename = random.choice(all_samples) # uniformly sampled
+            base_filename, _ = os.path.splitext(os.path.basename(filename))
+            params["rand"]["filename"] = base_filename
+
+            params["rand"]["time_noise_normal"] = np.random.normal(scale=1)
+            # np.random.normal(size=(1,),scale=1).astype(np.float32)
+            offset_noise_x = -0.06 + np.random.rand() * (0.06 - (-0.06))
+            offset_noise_y = -0.06 + np.random.rand() * (0.06 - (-0.06))
+            params["rand"]["offset_noise_2d"] = np.array([offset_noise_x, offset_noise_y, 0], dtype = np.float64)
+        
+        elif self.generator_type == "simulated":
+            # NOTE: Don't start too close, give the agent some time.
+            # theta = np.random.rand() * np.pi/7 + np.pi/7
+            params["rand"]["radius"] = np.random.rand() * 0.35 + 0.25
+            params["rand"]["theta"] = np.random.rand() * np.pi/14 + np.pi/14
+            params["rand"]["ex"] = -0.045 # + 0.020 * (2*np.random.rand()-1)
+            params["rand"]["ey"] = -0.10
+            # ex = -0.05  + 0.020 * (2*np.random.rand()-1)
+            # ey = -0.095 + 0.020 * (2*np.random.rand()-1)
+            params["rand"]["ez"] = 0.10 + 0.020 * (2*np.random.rand()-1)
+
+        #################################
+        
+
+        return params
+
+
+
 
 
 
@@ -198,26 +311,28 @@ class Hand(base.Task):
         # print(physics.named.model.geom_quat)
         # exit()
 
-        self.parameters = collections.OrderedDict()
-        self.infos = collections.OrderedDict()
+        #####################
+        ## Initializations ##
+        #####################
         self.termination = False
         self.episode += 1
-
         if self.allow_demos:
             # print(">>>> TEACHING in explorer [{}].".format(self.explorer_mode))
             self.mode = "teaching"
         else:
             # print(">>>> TRAINING in explorer [{}].".format(self.explorer_mode))
             self.mode = "training"
-        
 
+        # Setting up robot grasp controller
         # Grasp controllers in the teaching and training modes can be different.
         self.grasper = {}
         self.grasper["training"] = _GRASP_CONTROLLER_AGENT(physics)
         self.grasper["teaching"] = _GRASP_CONTROLLER_TEACHER(physics)
 
 
-        
+        ###########################################
+        ### Setting up the trajectory generator ###
+        ###########################################
         if self.generator_type == "simulated":
             trajectory_class = SimulatedTrajectory
         elif self.generator_type == "real":
@@ -227,7 +342,24 @@ class Hand(base.Task):
         else:
             raise ValueError("'generator_type' is not valid.")
         
-        trajectory = trajectory_class(self.environment_kwargs, self.generator_args)
+        it = 10
+        while (it>0):
+            it -= 1
+            try:
+                ##################################
+                ## Setting up random parameters ##
+                ##################################
+                params = self.sampler()
+
+                ## Trajectory object instantiation
+                trajectory = trajectory_class(self.environment_kwargs, self.generator_args, random_params=params["rand"])
+                break
+            except Exception as e:
+                print(e)
+                print("Hit an error while sampling a trajectory. {} trials left.".format(it))
+                print()
+                pass
+        
         generator = trajectory.get_generator_list()
         self.mocap_controller = MocapController(generator)
         
@@ -251,33 +383,31 @@ class Hand(base.Task):
         ###################################
         ## Setting finger initial values ##
         ###################################
-        # Start half-closed
-        # t = 0.5 # np.random.rand()
-        t = np.random.rand()
+        # t = float(params["parameters"]["initial_closure"].strip("[]"))
+        t = params["parameters"]["initial_closure"]
         physics.named.data.qpos["TPJ"] = -0.57*t #-0.57 0
         physics.named.data.qpos["IPJ"] =  1.57*t # 0 1.57
         physics.named.data.qpos["MPJ"] =  1.57*t # 0 1.57
         physics.named.data.qpos["RPJ"] =  1.57*t # 0 1.57
         physics.named.data.qpos["PPJ"] =  1.57*t # 0 1.57
 
-        # Recording all random parameters
-        self.parameters["initial_closure"] = np.array(t, dtype=np.float32)
+        #############################################################################
+        ## Handling extra parameters (self.parameters and self.infos["rand"]) here ##
+        #############################################################################
+        ## Parameters will be reflected in observations
+        self.parameters = params["parameters"]
         self.parameters["real_trajectory"] = np.array(self.generator_type == "real", dtype=np.uint8)
-        ####
-        # TODO: We may couple controller_gain and controller_thre. Because if threshold
-        #       is smaller the controller should be faster.
-        # self.parameters["controller_gain"] = 1.00 + np.random.rand() * (5 - 1)     # _GRASPER_GAIN = 2
-        # self.parameters["controller_thre"] = 0.01 + np.random.rand() * (0.25-0.01) # _DISTANCE_NORMALIZED_CRITICAL = 0.15
+        # print(self.parameters.keys())
+
+        ## infos["rand"] will be reflected in info
+        self.infos = collections.OrderedDict()
+        self.infos["rand"] = params["rand"]
+        self.infos["rand"].update(trajectory.parameters)
         
-        #  TODO: This is temporary. Ideally we have a very fast controller that closes just beside the hand:
-        self.parameters["controller_gain"] = 1.00 + np.random.rand() * (10 - 1)     # _GRASPER_GAIN = 2
-        # Seems to not have any effects!
-
-        self.parameters["controller_thre"] = 0.01 + np.random.rand() * (0.25-0.01)
-        # 0.15 # Should be in the range of 0.05 - 0.25
-
-        # Store "str" data types in the info. Otherwise we will get errors.
-        self.infos["rand"] = trajectory.parameters
+        # print(">>>> ", self.parameters)
+        # print("--------")
+        # print(">>>> ", self.infos["rand"])
+        # print()
         
         super(Hand, self).initialize_episode(physics)
 
@@ -541,7 +671,11 @@ class Hand(base.Task):
         # info has already been initialized in constructor and initial_episode.
         # obs['info'] = collections.OrderedDict()
         obs['info'] = self.infos
-        # obs['info']['param1'] = np.array(1, dtype=np.float32)
+
+        # ### TEST IT!
+        # obs['parameters']['test'] = np.array(int(self.termination), dtype=np.uint8)
+        # if 'rand' in obs['info']:
+        #     obs['info']['rand']['test'] = np.array(int(self.termination), dtype=np.uint8)
 
         return obs
 
