@@ -100,7 +100,11 @@ class RealTrajectory(Trajectory):
         time_scale_offset = self.generator_kwargs["time_scale_offset"]
         time_scale_factor = self.generator_kwargs["time_scale_factor"]
         time_noise_factor = self.generator_kwargs["time_noise_factor"]
+        time_staying_more = self.generator_kwargs["time_staying_more"] # How much time to stay more when trajectory reaches its end?
         extracts_path = self.generator_kwargs["extracts_path"]
+
+        
+
         
         control_timestep  = self.environment_kwargs["control_timestep"]
         time_limit = self.environment_kwargs["time_limit"]
@@ -253,7 +257,18 @@ class RealTrajectory(Trajectory):
         #       to find the frame of that point in the palm.
 
 
+        #################################
+        ### 
+        t_vector_stay = t_vector[-1] + np.linspace(control_timestep, time_staying_more*control_timestep, time_staying_more)
+        x_vector_stay = np.repeat(x_vector[-1:,:], time_staying_more, axis=0)
+        q_vector_stay = np.repeat(q_vector[-1:,:], time_staying_more, axis=0)
+        
+        t_vector = np.concatenate((t_vector, t_vector_stay), axis=0)
+        x_vector = np.concatenate((x_vector, x_vector_stay), axis=0)
+        q_vector = np.concatenate((q_vector, q_vector_stay), axis=0)
 
+        # x_vector_stay = x_vector[-1]
+        # q_vector_stay = 
         #################################
         ### Store trajectory data
         self.trajectory = {}

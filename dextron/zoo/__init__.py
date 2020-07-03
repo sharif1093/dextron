@@ -25,9 +25,10 @@ _DEFAULT_TIME_SCALE_FACTOR = 2.5 # 2.0
 _DEFAULT_TIME_NOISE_FACTOR = 0.8
 
 task_kwargs = {"generator_type":"real",
-               "generator_args":{"time_scale_offset":_DEFAULT_TIME_SCALE_OFFSET,
-                                 "time_scale_factor":_DEFAULT_TIME_SCALE_FACTOR,
-                                 "time_noise_factor":_DEFAULT_TIME_NOISE_FACTOR,
+               "generator_args":{"time_scale_offset":0.5, #1.0
+                                 "time_scale_factor":2.5, #2.0
+                                 "time_noise_factor":0.8, #
+                                 "time_staying_more":20,  # timesteps
                                  "extracts_path":"/workspace/extracts",
                                  "database_filename":None},
                "random":None,}

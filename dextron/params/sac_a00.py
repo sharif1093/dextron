@@ -46,7 +46,7 @@ cpanel = OrderedDict()
 ### Runner Parameters
 # num_frames = 10e6  # Number of frames to train
 cpanel["runner_name"]   = "dextron.pipeline.replay_runner.PlaybackRunner"
-cpanel["number_epochs"] = 1000  # epochs
+cpanel["number_epochs"] = 5000  # epochs
 cpanel["epoch_size"]    = 1000  # cycles
 cpanel["test_activate"] = True  # Test activated
 cpanel["test_interval"] = 10    # Test Interval Every #n Epochs
@@ -77,17 +77,15 @@ cpanel["observation_key"] = "/agent"
 cpanel["from_params"] = True
 
 # Environment parameters
-
-cpanel["database_filename"] = "/workspace/parameters/session_20200622201351_youthful_pascal.csv"
-
-# cpanel["extracts_path"] = "./workspace/extracts"
-cpanel["extracts_path"] = "/workspace/extracts"
+cpanel["database_filename"] = "./workspace/parameters/session_20200622201351_youthful_pascal.csv"
+cpanel["extracts_path"] = "./workspace/extracts"
 
 cpanel["generator_type"] = "real" # "simulated" # "real"
 cpanel["time_limit"] = 10.0 # Set the maximum time here!
 cpanel["time_scale_offset"] = 0.5 # 1.0
 cpanel["time_scale_factor"] = 2.5 # 2.0
 cpanel["time_noise_factor"] = 0.8
+cpanel["time_staying_more"] = 20 # timesteps
 cpanel["reward_threshold"] = 1.0
 cpanel["exclude_obs"] = []
 
@@ -127,6 +125,10 @@ cpanel["lr_value"] = 3e-4
 cpanel["lr_softq"] = 3e-4
 cpanel["lr_actor"] = 3e-4
 
+cpanel["hidden_size_value"] = 256
+cpanel["hidden_size_softq"] = 256
+cpanel["hidden_size_actor"] = 256
+
 # cpanel["eps"] = 1e-5 # Epsilon parameter used in the optimizer(s) (ADAM/RMSProp/...)
 
 cpanel["polyak_factor"] = 0.01
@@ -159,10 +161,12 @@ def gen_params(cpanel):
                        "generator_args":{"time_scale_offset":cpanel["time_scale_offset"],
                                          "time_scale_factor":cpanel["time_scale_factor"],
                                          "time_noise_factor":cpanel["time_noise_factor"],
+                                         "time_staying_more":cpanel["time_staying_more"], # timesteps
                                          "extracts_path":cpanel["extracts_path"],
                                          "database_filename":cpanel["database_filename"]},
                        "random":None,
-                       "pub_cameras":PUB_CAMERAS}
+                       "pub_cameras":PUB_CAMERAS,
+                       "exclude_obs":cpanel["exclude_obs"]}
 
         # task_kwargs = {"generator":{"time_scale_offset":cpanel["time_scale_offset"],
         #                             "time_scale_factor":cpanel["time_scale_factor"],
@@ -308,10 +312,9 @@ def gen_params(cpanel):
     params["agents"]["agent"]["policyargs"] = {"obs_space": params["env"]["config"]["observation_space"][observation_path],
                                                "act_space": params["env"]["config"]["action_space"][agent_name],
                                                "image_repr_size": 80,
-                                               "hidden_size": 256,
-                                               "value_args": {"init_w":0.003},
-                                               "softq_args": {"init_w":0.003},
-                                               "actor_args": {"init_w":0.003, "log_std_min":-20, "log_std_max":2},
+                                               "value_args": {"hidden_size": cpanel["hidden_size_value"], "init_w":0.003},
+                                               "softq_args": {"hidden_size": cpanel["hidden_size_softq"], "init_w":0.003},
+                                               "actor_args": {"hidden_size": cpanel["hidden_size_actor"], "init_w":0.003, "log_std_min":-20, "log_std_max":2},
                                                "average_args": {"mode":"soft", "polyak_factor":cpanel["polyak_factor"]},
                                                 # # {"mode":"hard", "interval":10000}
                                                }

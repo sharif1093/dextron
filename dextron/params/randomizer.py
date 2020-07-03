@@ -69,23 +69,19 @@ else:
 cpanel["from_params"] = True
 
 # Environment parameters
-# cpanel["database_filename"] = "/tmp/digideep_sessions_old/session_20200618092219_adoring_chebyshev/monitor.csv"
-# cpanel["database_filename"] = "/tmp/digideep_sessions_old/session_20200621184047_elegant_chebyshev/monitor.csv"
-# cpanel["database_filename"] = "/tmp/digideep_sessions/session_20200621220442_quizzical_jang/monitor.csv"
-# cpanel["database_filename"] = "/tmp/digideep_sessions/session_20200622142647_exciting_franklin/monitor.csv"
-
-# cpanel["database_filename"] = "/tmp/digideep_sessions_old/session_20200622180024_affectionate_goodall/monitor.csv"
+# cpanel["database_filename"] = "/workspace/parameters/session_20200622201351_youthful_pascal.csv"
 cpanel["database_filename"] = None
 
-
-cpanel["extracts_path"] = "./workspace/extracts"
+cpanel["extracts_path"] = "/workspace/extracts"
 # cpanel["extracts_path"] = "/workspace/extracts"
 cpanel["generator_type"] = "real" # "simulated" # "real"
-cpanel["time_limit"] = 10.0 # Set the maximum time here!
+cpanel["time_limit"] = 10.0  # Set the maximum time here!
 cpanel["time_scale_offset"] = 0.5 # 1.0
 cpanel["time_scale_factor"] = 2.5 # 2.0
 cpanel["time_noise_factor"] = 0.8
-cpanel["reward_threshold"] = 1.0
+cpanel["time_staying_more"] = 20  # timesteps
+cpanel["reward_threshold"] = 1.0  # We are not interested in rewards < 5.0
+cpanel["control_timestep"] = 0.02 # "0.02" is a reasonable control_timestep. "0.04" is a reasonable fast-forward.
 
 cpanel["gamma"] = 0.99     # The gamma parameter used in VecNormalize | Agent.preprocess | Agent.step
 
@@ -117,13 +113,14 @@ def gen_params(cpanel):
                        "generator_args":{"time_scale_offset":cpanel["time_scale_offset"],
                                          "time_scale_factor":cpanel["time_scale_factor"],
                                          "time_noise_factor":cpanel["time_noise_factor"],
+                                         "time_staying_more":cpanel["time_staying_more"], # timesteps
                                          "extracts_path":cpanel["extracts_path"],
                                          "database_filename":cpanel["database_filename"]},
                        "random":None,
                        "pub_cameras":PUB_CAMERAS}
         
         # visualize_reward=True
-        environment_kwargs = {"time_limit":cpanel["time_limit"], "control_timestep":0.02}
+        environment_kwargs = {"time_limit":cpanel["time_limit"], "control_timestep":cpanel["control_timestep"]}
         params["env"]["register_args"] = {"id":cpanel["model_name"],
                                           "entry_point":"digideep.environment.dmc2gym.wrapper:DmControlWrapper",
                                           "kwargs":{'dmcenv_creator':EnvCreator(grasp,

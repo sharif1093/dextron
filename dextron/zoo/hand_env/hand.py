@@ -175,6 +175,9 @@ class Hand(base.Task):
         
         self.mode = None
         self.termination = False
+        self.n_rewards = 0
+        self.physics_time = None
+        self.initial_mocap_height = 0
         self.episode = 0
         self.counter = 0
 
@@ -199,7 +202,7 @@ class Hand(base.Task):
         if filename:
             data = pd.read_csv(filename, low_memory=False, header=1)
             entry = data.sample(n=1, replace=True)
-            # entry = data.loc[[1]]
+            # entry = data.loc[[10]]
             # print(entry)
             entry = entry.to_dict('records')[0]
             # entry["/parameters/controller_gain"] = 2.2506406414265157
@@ -315,6 +318,7 @@ class Hand(base.Task):
         ## Initializations ##
         #####################
         self.termination = False
+        self.n_rewards = 0
         self.episode += 1
         if self.allow_demos:
             # print(">>>> TEACHING in explorer [{}].".format(self.explorer_mode))
@@ -409,6 +413,9 @@ class Hand(base.Task):
         # print(">>>> ", self.infos["rand"])
         # print()
         
+        # https://arxiv.org/pdf/1801.00690.pdf
+        physics.reset_context()
+        self.initial_mocap_height = physics.named.data.mocap_pos['mocap', 'z']
         super(Hand, self).initialize_episode(physics)
 
         
@@ -470,7 +477,7 @@ class Hand(base.Task):
         
         # 3) Send low-level actions for execution in the simulator.
         super(Hand, self).before_step(ctrl_actions, physics)
-        
+
         # Step the mocap body
         self.mocap_controller.step(physics)
         if self.mocap_controller.termination:
@@ -594,7 +601,8 @@ class Hand(base.Task):
             obs["agent"]["distance2"] = physics.get_distance_in_xy_plane()
         if not "closure" in self.exclude_obs:
             obs["agent"]["closure"] = physics.get_hand_closure()
-            
+        
+
 
         #############################
         ### Cameras ###
@@ -676,22 +684,42 @@ class Hand(base.Task):
         # obs['parameters']['test'] = np.array(int(self.termination), dtype=np.uint8)
         # if 'rand' in obs['info']:
         #     obs['info']['rand']['test'] = np.array(int(self.termination), dtype=np.uint8)
-
         return obs
 
     def get_reward(self, physics):
-        """Returns a reward applicable to the performed task."""
-        height = physics.named.data.xipos['long_cylinder', 'z']
-
-
+        """Returns a reward applicable to the performed task.
+        This is called from two places:
+          - suite > base.py > after_step: This is to visualize rewards
+          - control.py > step: This is the main step function.
+        """
+        cylinder = physics.named.data.xipos['long_cylinder', 'z']
+        
         # tolerance(x, bounds=(0.0, 0.0), margin=0.0, sigmoid='gaussian', value_at_margin=0.1):
-        height_object = rewards.tolerance(height, bounds=(0.25, np.inf), margin=0)
-        # height_object = (1 + height_object)/2
+        height_cylinder = rewards.tolerance(cylinder, bounds=(0.25, np.inf), margin=0)
+        # height_cylinder = (1 + height_cylinder)/2
+        reward = height_cylinder
 
-        reward = height_object
+        if self.physics_time != physics.time():
+            # We care about height of hand when it reaches the object.
+            mocap = physics.named.data.mocap_pos['mocap', 'z']
+            height_mocap = rewards.tolerance(mocap, bounds=(self.initial_mocap_height + (0.25-0.125) + 0.02, np.inf), margin=0)
+            # print("COMPARE mocap with height:", mocap, "(", height_mocap, ")" "<=>", cylinder, "(", height_cylinder, ") ------ ", self.n_rewards, "=====", self.initial_mocap_height)
+            # if (reward > 0) or (self.n_rewards > 0):
+            if (reward > 0) or (self.n_rewards > 0) or (height_mocap > 0):
+                """Start/continue counting if cylinder/mocap height above the threshold.
+                Also continue counting if counting already started for some reason.
+                """
+                # Count #N times. If reward is >0 for all of them then terminate.
+                self.n_rewards += 1
+                # print("Reward =", reward)
+            
+            if self.n_rewards >= self.generator_args["time_staying_more"]:
+                # print("Finished @", self.generator_args["time_staying_more"])
+                self.termination = True
+            
+            self.physics_time = physics.time()
         
         # Commands of the agent to the robot in the current step:      physics.control()
-
         # TODO: With velocity-based controllers we can penalize the amount of actuation sent
         #       to actuators. We can penalize the sum over absolute values of finger actuations.
 
