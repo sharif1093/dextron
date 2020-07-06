@@ -69,11 +69,11 @@ else:
 cpanel["from_params"] = True
 
 # Environment parameters
-# cpanel["database_filename"] = "/workspace/parameters/session_20200622201351_youthful_pascal.csv"
+# cpanel["database_filename"] = "./workspace/parameters/session_20200622201351_youthful_pascal.csv"
 cpanel["database_filename"] = None
 
-cpanel["extracts_path"] = "/workspace/extracts"
-# cpanel["extracts_path"] = "/workspace/extracts"
+cpanel["extracts_path"] = "./workspace/extracts"
+
 cpanel["generator_type"] = "real" # "simulated" # "real"
 cpanel["time_limit"] = 10.0  # Set the maximum time here!
 cpanel["time_scale_offset"] = 0.5 # 1.0
