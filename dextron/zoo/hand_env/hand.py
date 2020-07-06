@@ -255,7 +255,7 @@ class Hand(base.Task):
         # TODO: We may couple controller_gain and controller_thre. Because if threshold
         #       is smaller the controller should be faster.
         params["parameters"]["controller_gain"] = 1.00 + np.random.rand() * (10 - 1)     # _GRASPER_GAIN = 2
-        params["parameters"]["controller_thre"] = 0.01 + np.random.rand() * (0.50-0.01)
+        params["parameters"]["controller_thre"] = 0.01 + np.random.rand() * (0.90-0.01)
         
 
         ##################################################################
