@@ -252,7 +252,12 @@ if __name__=="__main__":
     for index in range(len(args.session_names)):
         args.session_names[index] = [os.path.relpath(t, args.root_dir) for y in args.session_names[index] for t in sorted(glob.glob(os.path.join(args.root_dir, y)))]
 
-    print("Added sessions are:\n", args.session_names)
+    # print("Commandline was:\n  ", " ".join(sys.argv[:]) )
+    print("Added sessions are:\n  ", args.session_names)
+
+    if args.session_names == [[]]:
+        print("No sessions were added ...")
+        sys.exit(1)
     
     if args.output_dir == '' and len(args.session_names) == 1:
         args.output_dir = os.path.join(args.session_names[0][0], 'plots')
@@ -270,8 +275,7 @@ if __name__=="__main__":
         for s in sublist:
             subloaders += [get_class(s + "." + "loader")]
         loaders += [subloaders]
-    
+
     pp = PostPlot(loaders, output_dir, **args.options)
     for key in args.options.get("key", ["/reward/train/episodic"]):
         pp.plot(key)
-    
