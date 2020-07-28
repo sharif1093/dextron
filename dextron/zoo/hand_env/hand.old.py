@@ -23,7 +23,7 @@ from dm_control import mujoco
 from dm_control.rl import control
 from dm_env import specs
 from dm_control.suite import base
-from dm_control.suite.utils import randomizers
+# from dm_control.suite.utils import randomizers
 from dm_control.utils import rewards
 
 
