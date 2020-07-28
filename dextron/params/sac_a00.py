@@ -46,7 +46,7 @@ cpanel = OrderedDict()
 ### Runner Parameters
 # num_frames = 10e6  # Number of frames to train
 cpanel["runner_name"]   = "dextron.pipeline.replay_runner.PlaybackRunner"
-cpanel["number_epochs"] = 5000  # epochs
+cpanel["number_epochs"] = 1500  # epochs
 cpanel["epoch_size"]    = 1000  # cycles
 cpanel["test_activate"] = True  # Test activated
 cpanel["test_interval"] = 10    # Test Interval Every #n Epochs
@@ -73,20 +73,27 @@ cpanel["demo_memory_size_in_chunks"] = int(1e6)
 ### Environment Parameters
 
 cpanel["model_name"] = 'CustomDMCHandGrasp-v0'
-cpanel["observation_key"] = "/agent"
+if PUB_CAMERAS:
+    cpanel["observation_key"] = "/camera"
+else:
+    cpanel["observation_key"] = "/agent"
 cpanel["from_params"] = True
 
 # Environment parameters
-cpanel["database_filename"] = "./workspace/parameters/session_20200622201351_youthful_pascal.csv"
+# cpanel["database_filename"] = "./workspace/parameters/session_20200622201351_youthful_pascal.csv"
+cpanel["database_filename"] = "./workspace/parameters/for-input/session_20200706062600_blissful_mcnulty.csv"
+
 cpanel["extracts_path"] = "./workspace/extracts"
 
 cpanel["generator_type"] = "real" # "simulated" # "real"
+# cpanel["generator_type"] = "simulated"
 cpanel["time_limit"] = 10.0 # Set the maximum time here!
 cpanel["time_scale_offset"] = 0.5 # 1.0
 cpanel["time_scale_factor"] = 2.5 # 2.0
 cpanel["time_noise_factor"] = 0.8
 cpanel["time_staying_more"] = 20 # timesteps
 cpanel["reward_threshold"] = 1.0
+cpanel["control_timestep"] = 0.02 # "0.02" is a reasonable control_timestep. "0.04" is a reasonable fast-forward.
 cpanel["exclude_obs"] = []
 
 cpanel["gamma"] = 0.99     # The gamma parameter used in VecNormalize | Agent.preprocess | Agent.step
@@ -131,14 +138,15 @@ cpanel["hidden_size_actor"] = 256
 
 # cpanel["eps"] = 1e-5 # Epsilon parameter used in the optimizer(s) (ADAM/RMSProp/...)
 
-cpanel["polyak_factor"] = 0.01
-# cpanel["target_update_interval"] = 1
-
 # cpanel["noise_std"] = 0.2
 
 cpanel["mean_lambda"] = 1e-3
 cpanel["std_lambda"]  = 1e-3
 cpanel["z_lambda"]    = 0.0
+
+### Policy Parameters
+cpanel["polyak_factor"] = 0.01
+# cpanel["target_update_interval"] = 1
 
 ################################################################################
 #########                      PARAMETER TREE                          #########
@@ -175,7 +183,7 @@ def gen_params(cpanel):
         #                "pub_cameras":PUB_CAMERAS,
         #                "exclude_obs":cpanel["exclude_obs"]} # "teaching_rate":cpanel["teaching_rate"]
         # visualize_reward=True
-        environment_kwargs = {"time_limit":cpanel["time_limit"], "control_timestep":0.02}
+        environment_kwargs = {"time_limit":cpanel["time_limit"], "control_timestep":cpanel["control_timestep"]}
         params["env"]["register_args"] = {"id":cpanel["model_name"],
                                           "entry_point":"digideep.environment.dmc2gym.wrapper:DmControlWrapper",
                                           "kwargs":{'dmcenv_creator':EnvCreator(grasp,
@@ -192,10 +200,11 @@ def gen_params(cpanel):
     norm_wrappers = []
 
     # Converting observation to 1 level
-    norm_wrappers.append(dict(name="digideep.environment.wrappers.normal.WrapperLevelDictObs",
-                              args={"path":cpanel["observation_key"],
-                              },
-                              enabled=True))
+    if not PUB_CAMERAS:
+        norm_wrappers.append(dict(name="digideep.environment.wrappers.normal.WrapperLevelDictObs",
+                                args={"path":cpanel["observation_key"],
+                                },
+                                enabled=True))
     # norm_wrappers.append(dict(name="digideep.environment.wrappers.normal.WrapperTransposeImage",
     #                           args={"path":"/camera"
     #                           },
@@ -217,15 +226,16 @@ def gen_params(cpanel):
                                         "axis":0},  # Axis=0 is required when ImageTransposeWrapper is called on the Atari games.
                                 enabled=True))
     # Normalizing observations
-    vect_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.VecNormalizeObsDict",
-                              args={"paths":[cpanel["observation_key"]],
-                                    "clip":5, # 10
-                                    "epsilon":1e-8
-                              },
-                              enabled=True))
+    if not PUB_CAMERAS:
+        vect_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.VecNormalizeObsDict",
+                                args={"paths":[cpanel["observation_key"]],
+                                        "clip":10,
+                                        "epsilon":1e-8
+                                },
+                                enabled=True))
     # Normalizing rewards
     vect_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.VecNormalizeRew",
-                              args={"clip":5, # 10
+                              args={"clip":10,
                                     "gamma":cpanel["gamma"],
                                     "epsilon":1e-8
                               },
