@@ -14,7 +14,7 @@ from collections import OrderedDict
 
 
 #################################
-###           PRETEXT         ###
+###          PREAMBLE         ###
 #################################
 PUB_CAMERAS = True
 
@@ -48,24 +48,29 @@ cpanel = OrderedDict()
 cpanel["runner_name"]   = "dextron.pipeline.replay_runner.PlaybackRunner"
 cpanel["number_epochs"] = 10000 # epochs
 cpanel["epoch_size"]    = 1000  # cycles
-cpanel["test_activate"] = True  # Test Activate
+cpanel["test_activate"] = True  # Test activated
 cpanel["test_interval"] = 10    # Test Interval Every #n Epochs
 cpanel["test_win_size"] = 10    # Number of episodes to run test.
-cpanel["save_interval"] = 10    # Save Interval Every #n Epochs
+cpanel["save_interval"] = 100
+# cpanel["number_epochs"] // 5  # Save Interval Every #n Epochs
+## Simulation will end when either time or max iterations exceed the following:
+cpanel["max_exec_time"] = 20    # hours
+cpanel["max_exec_iter"] = None  # number of epochs
 
 
-cpanel["scheduler_start"] = 0.3
+cpanel["scheduler_start"] = 0.3  # This is of equal effect as demo_use_ratio in a00 param set.
 cpanel["scheduler_steps"] = cpanel["epoch_size"] * 100
 cpanel["scheduler_decay"] = 1.0 # Never reduce!
 # cpanel["scheduler_decay"] = .95
 # Using combined experience replay (CER) in the sampler.
-cpanel["use_cer"] = False
+cpanel["use_cer"] = False # This did not prove useful at all!
 
 cpanel["seed"] = 0
 cpanel["cuda_deterministic"] = False # With TRUE we MIGHT get more deterministic results but at the cost of speed.
 
 #####################
 ### Memory Parameters
+cpanel["mempath"] = "/tmp"
 cpanel["memory_size_in_chunks"] = int(1e5)
 cpanel["demo_memory_size_in_chunks"] = int(1e5)
 # SHOULD be 1 for on-policy methods that do not have a replay buffer.
@@ -79,14 +84,24 @@ if PUB_CAMERAS:
     cpanel["observation_key"] = "/camera"
 else:
     cpanel["observation_key"] = "/agent"
-
 cpanel["from_params"] = True
+
 # Environment parameters
-cpanel["generator_type"] = "simulated"
+# cpanel["database_filename"] = "./workspace/parameters/session_20200622201351_youthful_pascal.csv"
+cpanel["database_filename"] = "./workspace/parameters/for-input/session_20200706062600_blissful_mcnulty.csv"
+
+cpanel["extracts_path"] = "./workspace/extracts"
+
+cpanel["generator_type"] = "real" # "simulated" # "real"
+# cpanel["generator_type"] = "simulated"
 cpanel["time_limit"] = 10.0 # Set the maximum time here!
 cpanel["time_scale_offset"] = 0.5 # 1.0
-cpanel["time_scale_factor"] = 1.5 # 2.0
-cpanel["time_noise_factor"] = 0.2
+cpanel["time_scale_factor"] = 2.5 # 2.0
+cpanel["time_noise_factor"] = 0.8
+cpanel["time_staying_more"] = 20 # timesteps
+cpanel["reward_threshold"] = 1.0
+cpanel["control_timestep"] = 0.02 # "0.02" is a reasonable control_timestep. "0.04" is a reasonable fast-forward.
+cpanel["exclude_obs"] = []
 
 cpanel["gamma"] = 0.99     # The gamma parameter used in VecNormalize | Agent.preprocess | Agent.step
 
@@ -107,6 +122,7 @@ cpanel["gamma"] = 0.99     # The gamma parameter used in VecNormalize | Agent.pr
 ### Exploration (~ num_workers * n_steps)
 cpanel["num_workers"] = 1     # From Explorer           # Number of exploratory workers working together
 cpanel["n_steps"] = 1         # From Explorer           # Number of frames to produce
+cpanel["render"] = False # In the test
 ### Exploitation (~ n_update * batch_size)
 cpanel["n_update"] = 1        # From Agents: Updates per step
 cpanel["batch_size"] = 32     # From Agents
@@ -124,6 +140,10 @@ cpanel["lr_value"] = 3e-4
 cpanel["lr_softq"] = 3e-4
 cpanel["lr_actor"] = 3e-4
 
+cpanel["hidden_size_value"] = 256
+cpanel["hidden_size_softq"] = 256
+cpanel["hidden_size_actor"] = 256
+
 # cpanel["eps"] = 1e-5 # Epsilon parameter used in the optimizer(s) (ADAM/RMSProp/...)
 
 # cpanel["noise_std"] = 0.2
@@ -133,8 +153,8 @@ cpanel["std_lambda"]  = 1e-3
 cpanel["z_lambda"]    = 0.0
 
 ### Policy Parameters
-cpanel["image_repr_type"] = "cnn" # cnn | coordconv
 cpanel["polyak_factor"] = 0.01
+cpanel["image_repr_type"] = "cnn" # cnn | coordconv
 # cpanel["target_update_interval"] = 1
 
 ################################################################################
@@ -158,12 +178,15 @@ def gen_params(cpanel):
                        "generator_args":{"time_scale_offset":cpanel["time_scale_offset"],
                                          "time_scale_factor":cpanel["time_scale_factor"],
                                          "time_noise_factor":cpanel["time_noise_factor"],
-                                         "extracts_path":"/workspace/extracts"},
+                                         "time_staying_more":cpanel["time_staying_more"], # timesteps
+                                         "extracts_path":cpanel["extracts_path"],
+                                         "database_filename":cpanel["database_filename"]},
                        "random":None,
-                       "pub_cameras":PUB_CAMERAS} # "teaching_rate":cpanel["teaching_rate"]
+                       "pub_cameras":PUB_CAMERAS,
+                       "exclude_obs":cpanel["exclude_obs"]}
         
         # visualize_reward=True
-        environment_kwargs = {"time_limit":cpanel["time_limit"], "control_timestep":0.02}
+        environment_kwargs = {"time_limit":cpanel["time_limit"], "control_timestep":cpanel["control_timestep"]}
         params["env"]["register_args"] = {"id":cpanel["model_name"],
                                           "entry_point":"digideep.environment.dmc2gym.wrapper:DmControlWrapper",
                                           "kwargs":{'dmcenv_creator':EnvCreator(grasp,
@@ -205,17 +228,23 @@ def gen_params(cpanel):
                                         "nstack":4, # By DQN Nature paper, it is called: phi length
                                         "axis":0},  # Axis=0 is required when ImageTransposeWrapper is called on the Atari games.
                                 enabled=True))
+
+        # vect_wrappers.append(dict(name="digideep.environment.wrappers.vector.VecFrameStackAxis",
+        #                         args={"path":"/depth",
+        #                                 "nstack":4, # By DQN Nature paper, it is called: phi length
+        #                                 "axis":0},  # Axis=0 is required when ImageTransposeWrapper is called on the Atari games.
+        #                         enabled=True))
     # Normalizing observations
     if not PUB_CAMERAS:
         vect_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.VecNormalizeObsDict",
                                 args={"paths":[cpanel["observation_key"]],
-                                        "clip":5, # 10
+                                        "clip":10, # 5 or 10?
                                         "epsilon":1e-8
                                 },
                                 enabled=True))
     # Normalizing rewards
     vect_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.VecNormalizeRew",
-                              args={"clip":5, # 10
+                              args={"clip":10, # 5 or 10?
                                     "gamma":cpanel["gamma"],
                                     "epsilon":1e-8
                               },
@@ -244,6 +273,8 @@ def gen_params(cpanel):
     #####################################
     params["runner"] = {}
     params["runner"]["name"] = cpanel.get("runner_name", "digideep.pipeline.Runner")
+    params["runner"]["max_time"] = cpanel.get("max_exec_time", None)
+    params["runner"]["max_iter"] = cpanel.get("max_exec_iter", None)
     params["runner"]["n_cycles"] = cpanel["epoch_size"]    # Meaning that 100 cycles are 1 epoch.
     params["runner"]["n_epochs"] = cpanel["number_epochs"] # Testing and savings are done after each epoch.
     params["runner"]["randargs"] = {'seed':cpanel["seed"], 'cuda_deterministic':cpanel["cuda_deterministic"]}
@@ -312,10 +343,9 @@ def gen_params(cpanel):
                                                "act_space": params["env"]["config"]["action_space"][agent_name],
                                                "image_repr_type": cpanel["image_repr_type"], # cnn | coordconv
                                                "image_repr_size": 80,
-                                               "hidden_size": 256,
-                                               "value_args": {"init_w":0.003},
-                                               "softq_args": {"init_w":0.003},
-                                               "actor_args": {"init_w":0.003, "log_std_min":-20, "log_std_max":2},
+                                               "value_args": {"hidden_size": cpanel["hidden_size_value"], "init_w":0.003},
+                                               "softq_args": {"hidden_size": cpanel["hidden_size_softq"], "init_w":0.003},
+                                               "actor_args": {"hidden_size": cpanel["hidden_size_actor"], "init_w":0.003, "log_std_min":-20, "log_std_max":2},
                                                "average_args": {"mode":"soft", "polyak_factor":cpanel["polyak_factor"]},
                                                 # # {"mode":"hard", "interval":10000}
                                                }
@@ -341,8 +371,8 @@ def gen_params(cpanel):
     params["agents"]["agent"]["optimargs_actor"] = {"lr":cpanel["lr_actor"]}   # , "eps":cpanel["eps"]
 
 
-    # # RMSprop optimizer alpha
-    # # params["agents"]["agent"]["optimargs"] = {"lr":1e-2, "alpha":0.99, "eps":1e-5, "weight_decay":0, "momentum":0, "centered":False}
+    # RMSprop optimizer alpha
+    # params["agents"]["agent"]["optimargs"] = {"lr":1e-2, "alpha":0.99, "eps":1e-5, "weight_decay":0, "momentum":0, "centered":False}
     ##############################################
 
     
@@ -373,12 +403,12 @@ def gen_params(cpanel):
     # buffer_chunk_len: Number of chunks in the buffer
 
     params["memory"]["train"] = {}
-    params["memory"]["train"]["type"] = "digideep.memory.ringbuffer.Memory"
-    params["memory"]["train"]["args"] = {"chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["memory_size_in_chunks"], "overrun":1}
+    params["memory"]["train"]["type"] = "digideep.memory.ringbuffer_disk.Memory"
+    params["memory"]["train"]["args"] = {"name":"train", "mempath":cpanel.get("mempath", "/tmp"), "chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["memory_size_in_chunks"], "overrun":1}
     
     params["memory"]["demo"] = {}
-    params["memory"]["demo"]["type"] = "digideep.memory.ringbuffer.Memory"
-    params["memory"]["demo"]["args"] = {"chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["demo_memory_size_in_chunks"], "overrun":1}
+    params["memory"]["demo"]["type"] = "digideep.memory.ringbuffer_disk.Memory"
+    params["memory"]["demo"]["args"] = {"name":"demo", "mempath":cpanel.get("mempath", "/tmp"), "chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["demo_memory_size_in_chunks"], "overrun":1}
 
     # params["memory"]["replay"] = {}
     # params["memory"]["replay"]["type"] = "digideep.memory.ringbuffer.Memory"
@@ -452,7 +482,7 @@ def gen_params(cpanel):
     params["explorer"]["demo"]["n_steps"] = cpanel["n_steps"] # Number of steps to take a step in the environment
     params["explorer"]["demo"]["n_episodes"] = None
     params["explorer"]["demo"]["win_size"] = -1
-    params["explorer"]["demo"]["render"] = False # True # False
+    params["explorer"]["demo"]["render"] = cpanel["render"]
     params["explorer"]["demo"]["render_delay"] = 0
     params["explorer"]["demo"]["seed"] = cpanel["seed"] + 50
     params["explorer"]["demo"]["extra_env_kwargs"] = {"mode":params["explorer"]["demo"]["mode"], "allow_demos":True}
