@@ -3,7 +3,6 @@ This implementation is mainly adopted from `RL-Adventure-2 <https://github.com/h
 """
 
 import numpy as np
-import random
 from copy import deepcopy
 
 import torch
