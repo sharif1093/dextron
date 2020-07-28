@@ -51,7 +51,10 @@ cpanel["epoch_size"]    = 1000  # cycles
 cpanel["test_activate"] = True  # Test activated
 cpanel["test_interval"] = 10    # Test Interval Every #n Epochs
 cpanel["test_win_size"] = 10    # Number of episodes to run test.
-cpanel["save_interval"] = 10    # Save Interval Every #n Epochs
+cpanel["save_interval"] = 50    # Save Interval Every #n Epochs
+## Simulation will end when either time or max iterations exceed the following:
+cpanel["max_exec_time"] = 20     # hours
+cpanel["max_exec_iter"] = None   # number of epochs
 
 
 cpanel["scheduler_start"] = 0.3
@@ -175,13 +178,7 @@ def gen_params(cpanel):
                        "random":None,
                        "pub_cameras":PUB_CAMERAS,
                        "exclude_obs":cpanel["exclude_obs"]}
-
-        # task_kwargs = {"generator":{"time_scale_offset":cpanel["time_scale_offset"],
-        #                             "time_scale_factor":cpanel["time_scale_factor"],
-        #                             "time_noise_factor":cpanel["time_noise_factor"]},
-        #                "random":None,
-        #                "pub_cameras":PUB_CAMERAS,
-        #                "exclude_obs":cpanel["exclude_obs"]} # "teaching_rate":cpanel["teaching_rate"]
+        
         # visualize_reward=True
         environment_kwargs = {"time_limit":cpanel["time_limit"], "control_timestep":cpanel["control_timestep"]}
         params["env"]["register_args"] = {"id":cpanel["model_name"],
@@ -229,13 +226,13 @@ def gen_params(cpanel):
     if not PUB_CAMERAS:
         vect_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.VecNormalizeObsDict",
                                 args={"paths":[cpanel["observation_key"]],
-                                        "clip":10,
+                                        "clip":10, # 5 or 10?
                                         "epsilon":1e-8
                                 },
                                 enabled=True))
     # Normalizing rewards
     vect_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.VecNormalizeRew",
-                              args={"clip":10,
+                              args={"clip":10, # 5 or 10?
                                     "gamma":cpanel["gamma"],
                                     "epsilon":1e-8
                               },
@@ -264,6 +261,8 @@ def gen_params(cpanel):
     #####################################
     params["runner"] = {}
     params["runner"]["name"] = cpanel.get("runner_name", "digideep.pipeline.Runner")
+    params["runner"]["max_time"] = cpanel.get("max_exec_time", None)
+    params["runner"]["max_iter"] = cpanel.get("max_exec_iter", None)
     params["runner"]["n_cycles"] = cpanel["epoch_size"]    # Meaning that 100 cycles are 1 epoch.
     params["runner"]["n_epochs"] = cpanel["number_epochs"] # Testing and savings are done after each epoch.
     params["runner"]["randargs"] = {'seed':cpanel["seed"], 'cuda_deterministic':cpanel["cuda_deterministic"]}
@@ -380,11 +379,11 @@ def gen_params(cpanel):
 
     params["memory"]["train"] = {}
     params["memory"]["train"]["type"] = "digideep.memory.ringbuffer.Memory"
-    params["memory"]["train"]["args"] = {"chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["memory_size_in_chunks"], "overrun":1}
+    params["memory"]["train"]["args"] = {"name":"train", "chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["memory_size_in_chunks"], "overrun":1}
     
     params["memory"]["demo"] = {}
     params["memory"]["demo"]["type"] = "digideep.memory.ringbuffer.Memory"
-    params["memory"]["demo"]["args"] = {"chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["demo_memory_size_in_chunks"], "overrun":1}
+    params["memory"]["demo"]["args"] = {"name":"demo", "chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["demo_memory_size_in_chunks"], "overrun":1}
 
     ##############################################
 
