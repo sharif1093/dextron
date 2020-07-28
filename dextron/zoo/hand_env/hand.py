@@ -16,14 +16,14 @@ import collections
 import numpy as np
 import pandas as pd
 import sys, os, glob
-import random
+# import random
 import json
 
 from dm_control import mujoco
 from dm_control.rl import control
 from dm_env import specs
 from dm_control.suite import base
-from dm_control.suite.utils import randomizers
+# from dm_control.suite.utils import randomizers
 from dm_control.utils import rewards
 
 from dextron.zoo.hand_env.myquaternion import *
@@ -189,8 +189,6 @@ class Hand(base.Task):
 
 
 
-
-
     def sampler(self):
         """
         In this module, we either
@@ -200,15 +198,21 @@ class Hand(base.Task):
         filename = self.generator_args.get("database_filename", None)
 
         if filename:
-            data = pd.read_csv(filename, low_memory=False, header=1)
-            entry = data.sample(n=1, replace=True)
-            # entry = data.loc[[10]]
-            # print(entry)
-            entry = entry.to_dict('records')[0]
-            # entry["/parameters/controller_gain"] = 2.2506406414265157
-            # entry["/parameters/controller_thre"] = 0.036953724073228306
+            ## Use with raw csv files (r in [0,20] and 2 line headers)
+            # data = pd.read_csv(filename, low_memory=False, header=1)
+            # entry = data[data["r"]==20].sample(n=1, replace=True)
 
-            # '/rand/offset_noise_2d'
+            ## Use with modified csv files with one line of header and r==20
+            data = pd.read_csv(filename, low_memory=False, header=0)
+
+            ## Sampling
+            ## For debugging: Always use a fixed row:
+            # entry = data.iloc[10]
+            ## Using pandas sample method. Not desiarable due to reproducibility.
+            # entry = data.sample(n=1, replace=True)
+            # entry = entry.to_dict('records')[0]
+            ## Using self._random alternatively.
+            entry = data.iloc[self._random.randint(len(data))].to_dict()
 
             params = collections.OrderedDict()
             params["parameters"] = collections.OrderedDict()
@@ -222,7 +226,8 @@ class Hand(base.Task):
                 if k.startswith("/rand/"):
                     k_ = k[len("/rand/"):]
                     params["rand"][k_] = entry[k]
-                
+            
+            
             # print(params["parameters"].keys())
             # Modifying some keys.
             # '/rand/offset_noise_2d'
@@ -250,12 +255,12 @@ class Hand(base.Task):
         # Recording all random parameters
         # Start half-closed
         # t = 0.5
-        params["parameters"]["initial_closure"] = np.random.rand()
-        # np.random.rand(1).astype(np.float32)
+        params["parameters"]["initial_closure"] = self._random.rand()
+        # self._random.rand(1).astype(np.float32)
         # TODO: We may couple controller_gain and controller_thre. Because if threshold
         #       is smaller the controller should be faster.
-        params["parameters"]["controller_gain"] = 1.00 + np.random.rand() * (10 - 1)     # _GRASPER_GAIN = 2
-        params["parameters"]["controller_thre"] = 0.01 + np.random.rand() * (0.90-0.01)
+        params["parameters"]["controller_gain"] = 1.00 + self._random.rand() * (10 - 1)     # _GRASPER_GAIN = 2
+        params["parameters"]["controller_thre"] = 0.01 + self._random.rand() * (0.90-0.01)
         
 
         ##################################################################
@@ -270,26 +275,26 @@ class Hand(base.Task):
             extracts_path = self.generator_args["extracts_path"]
             extracts_path_jsons = os.path.join(extracts_path, "*.json")
             all_samples = sorted(glob.glob(extracts_path_jsons))
-            filename = random.choice(all_samples) # uniformly sampled
+            filename = self._random.choice(all_samples, replace=True) # uniformly sampled
             base_filename, _ = os.path.splitext(os.path.basename(filename))
             params["rand"]["filename"] = base_filename
 
-            params["rand"]["time_noise_normal"] = np.random.normal(scale=1)
-            # np.random.normal(size=(1,),scale=1).astype(np.float32)
-            offset_noise_x = -0.06 + np.random.rand() * (0.06 - (-0.06))
-            offset_noise_y = -0.06 + np.random.rand() * (0.06 - (-0.06))
+            params["rand"]["time_noise_normal"] = self._random.normal(scale=1)
+            # self._random.normal(size=(1,),scale=1).astype(np.float32)
+            offset_noise_x = -0.06 + self._random.rand() * (0.06 - (-0.06))
+            offset_noise_y = -0.06 + self._random.rand() * (0.06 - (-0.06))
             params["rand"]["offset_noise_2d"] = np.array([offset_noise_x, offset_noise_y, 0], dtype = np.float64)
         
         elif self.generator_type == "simulated":
             # NOTE: Don't start too close, give the agent some time.
-            # theta = np.random.rand() * np.pi/7 + np.pi/7
-            params["rand"]["radius"] = np.random.rand() * 0.35 + 0.25
-            params["rand"]["theta"] = np.random.rand() * np.pi/14 + np.pi/14
-            params["rand"]["ex"] = -0.045 # + 0.020 * (2*np.random.rand()-1)
+            # theta = self._random.rand() * np.pi/7 + np.pi/7
+            params["rand"]["radius"] = self._random.rand() * 0.35 + 0.25
+            params["rand"]["theta"] = self._random.rand() * np.pi/14 + np.pi/14
+            params["rand"]["ex"] = -0.045 # + 0.020 * (2*self._random.rand()-1)
             params["rand"]["ey"] = -0.10
-            # ex = -0.05  + 0.020 * (2*np.random.rand()-1)
-            # ey = -0.095 + 0.020 * (2*np.random.rand()-1)
-            params["rand"]["ez"] = 0.10 + 0.020 * (2*np.random.rand()-1)
+            # ex = -0.05  + 0.020 * (2*self._random.rand()-1)
+            # ey = -0.095 + 0.020 * (2*self._random.rand()-1)
+            params["rand"]["ez"] = 0.10 + 0.020 * (2*self._random.rand()-1)
 
         #################################
         
@@ -359,7 +364,7 @@ class Hand(base.Task):
                 trajectory = trajectory_class(self.environment_kwargs, self.generator_args, random_params=params["rand"])
                 break
             except Exception as e:
-                print(e)
+                print(repr(e))
                 print("Hit an error while sampling a trajectory. {} trials left.".format(it))
                 print()
                 pass
@@ -602,18 +607,49 @@ class Hand(base.Task):
         if not "closure" in self.exclude_obs:
             obs["agent"]["closure"] = physics.get_hand_closure()
         
+        if not "timestep" in self.exclude_obs:
+            obs["agent"]["timestep"] = np.array( physics.time() / self.environment_kwargs["control_timestep"] )
 
 
         #############################
         ### Cameras ###
         ###############
         # render(height=240, width=320, camera_id=-1, overlays=(), depth=False, segmentation=False, scene_option=None)
+        # render(height=240, width=320, camera_id=-1, overlays=(), depth=False, segmentation=False, scene_option=None, render_flag_overrides=None)
         if self.pub_cameras:
-            obs["camera"] = physics.rgb2gray(physics.render(width=60*4, height=60*3, camera_id="fixed")).astype(np.uint8)
+            self.counter += 1
+            # camera = physics.rgb2gray(physics.render(width=60*4, height=60*3, camera_id="fixed")).astype(np.uint8)
+            camera_rgb = physics.render(width=60*4, height=60*3, camera_id="fixed")
+            # img_rgb = Image.fromarray(camera_rgb)
+            # img_rgb.save("/master/reports/frames/{:04d}_rgb_{}.jpg".format(self.counter, self.explorer_mode))
+
+            # camera_gray = physics.rgb2gray(physics.render(width=60*4, height=60*3, camera_id="fixed")).astype(np.uint8)
+            # camera_gray = np.squeeze(camera_gray)
+            # print(">>>>>>> camera_gray shape:", camera_gray.shape)
+            # img_gray = Image.fromarray(camera_gray, 'L')
+            # img_gray.save("/master/reports/frames/{:04d}_gray_{}.jpg".format(self.counter, self.explorer_mode))
+
+
+            # depth  = physics.render(width=60*4, height=60*3, camera_id="fixed", depth=True)
+            # depth = (depth / 5 * 255).astype(np.uint8)
+            # img_depth = Image.fromarray(depth, 'L')
+            # img_depth.save("/master/reports/frames/{:04d}_depth_{}.jpg".format(self.counter, self.explorer_mode))
+
+            obs["camera"] = physics.rgb2gray(camera_rgb).astype(np.uint8)
+            # print("Camera shape=", obs["camera"].shape)
             
-            # image, depth = physics.render(width=60*4, height=60*3, camera_id="fixed", depth=True)
-            # obs["camera"] = physics.rgb2gray(image).astype(np.uint8)
-            # obs["depth"]  = depth
+
+            # We'd better whatever we want to do here and then pass a single camera key to obs.
+            # obs["camera"]
+            
+            # camera = physics.rgb2gray(image).astype(np.uint8)
+            # depth  = depth
+
+            # # print(type(camera))
+            # print("Camera shape =", camera.shape, "| Camera type =", type(camera))
+            # print("Depth shape =", depth.shape, "| Depth type =", type(depth))
+            # exit()
+
 
         # print(obs["camera"].shape)
         # (256, 4, 84, 84)
