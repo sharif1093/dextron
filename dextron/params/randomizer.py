@@ -70,6 +70,7 @@ cpanel["from_params"] = True
 
 # Environment parameters
 # cpanel["database_filename"] = "./workspace/parameters/session_20200622201351_youthful_pascal.csv"
+# cpanel["database_filename"] = "./workspace/parameters/for-input/session_20200706062600_blissful_mcnulty.csv"
 cpanel["database_filename"] = None
 
 cpanel["extracts_path"] = "./workspace/extracts"
