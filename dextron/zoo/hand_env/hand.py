@@ -197,7 +197,7 @@ class Hand(base.Task):
         """
         filename = self.generator_args.get("database_filename", None)
 
-        if filename:
+        if filename and (self.generator_type == "real"):
             ## Use with raw csv files (r in [0,20] and 2 line headers)
             # data = pd.read_csv(filename, low_memory=False, header=1)
             # entry = data[data["r"]==20].sample(n=1, replace=True)
