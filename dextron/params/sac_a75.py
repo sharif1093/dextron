@@ -54,8 +54,9 @@ cpanel["test_win_size"] = 10    # Number of episodes to run test.
 cpanel["save_interval"] = 100
 # cpanel["number_epochs"] // 5  # Save Interval Every #n Epochs
 ## Simulation will end when either time or max iterations exceed the following:
-cpanel["max_exec_time"] = 20    # hours
+cpanel["max_exec_time"] = None  # hours
 cpanel["max_exec_iter"] = None  # number of epochs
+# Also `kill -SIGUSR1 PID` is sent the process exists and saves checkpoint at it soonest time.
 
 
 cpanel["scheduler_start"] = 0.3  # This is of equal effect as demo_use_ratio in a00 param set.
@@ -70,7 +71,7 @@ cpanel["cuda_deterministic"] = False # With TRUE we MIGHT get more deterministic
 
 #####################
 ### Memory Parameters
-cpanel["mempath"] = "/tmp"
+# cpanel["mempath"] = "/tmp"
 cpanel["memory_size_in_chunks"] = int(1e5)
 cpanel["demo_memory_size_in_chunks"] = int(1e5)
 # SHOULD be 1 for on-policy methods that do not have a replay buffer.
@@ -275,6 +276,7 @@ def gen_params(cpanel):
     params["runner"]["name"] = cpanel.get("runner_name", "digideep.pipeline.Runner")
     params["runner"]["max_time"] = cpanel.get("max_exec_time", None)
     params["runner"]["max_iter"] = cpanel.get("max_exec_iter", None)
+
     params["runner"]["n_cycles"] = cpanel["epoch_size"]    # Meaning that 100 cycles are 1 epoch.
     params["runner"]["n_epochs"] = cpanel["number_epochs"] # Testing and savings are done after each epoch.
     params["runner"]["randargs"] = {'seed':cpanel["seed"], 'cuda_deterministic':cpanel["cuda_deterministic"]}
@@ -404,11 +406,13 @@ def gen_params(cpanel):
 
     params["memory"]["train"] = {}
     params["memory"]["train"]["type"] = "digideep.memory.ringbuffer_disk.Memory"
-    params["memory"]["train"]["args"] = {"name":"train", "mempath":cpanel.get("mempath", "/tmp"), "chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["memory_size_in_chunks"], "overrun":1}
+    # params["memory"]["train"]["args"] = {"name":"train", "mempath":cpanel.get("mempath", "/tmp"), "chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["memory_size_in_chunks"], "overrun":1}
+    params["memory"]["train"]["args"] = {"name":"train", "chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["memory_size_in_chunks"], "overrun":1}
     
     params["memory"]["demo"] = {}
     params["memory"]["demo"]["type"] = "digideep.memory.ringbuffer_disk.Memory"
-    params["memory"]["demo"]["args"] = {"name":"demo", "mempath":cpanel.get("mempath", "/tmp"), "chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["demo_memory_size_in_chunks"], "overrun":1}
+    # params["memory"]["demo"]["args"] = {"name":"demo", "mempath":cpanel.get("mempath", "/tmp"), "chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["demo_memory_size_in_chunks"], "overrun":1}
+    params["memory"]["demo"]["args"] = {"name":"demo", "chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["demo_memory_size_in_chunks"], "overrun":1}
 
     # params["memory"]["replay"] = {}
     # params["memory"]["replay"]["type"] = "digideep.memory.ringbuffer.Memory"
@@ -449,7 +453,7 @@ def gen_params(cpanel):
     params["explorer"]["test"]["n_steps"] = None # Do not limit # of steps
     params["explorer"]["test"]["n_episodes"] = cpanel["test_win_size"]
     params["explorer"]["test"]["win_size"] = cpanel["test_win_size"] # Extra episodes won't be counted
-    params["explorer"]["test"]["render"] = False
+    params["explorer"]["test"]["render"] = cpanel["render"]
     params["explorer"]["test"]["render_delay"] = 0
     params["explorer"]["test"]["seed"] = cpanel["seed"] + 100 # We want to make the seed of test environments different from training.
     params["explorer"]["test"]["extra_env_kwargs"] = {"mode":params["explorer"]["test"]["mode"], "allow_demos":False}
@@ -482,7 +486,7 @@ def gen_params(cpanel):
     params["explorer"]["demo"]["n_steps"] = cpanel["n_steps"] # Number of steps to take a step in the environment
     params["explorer"]["demo"]["n_episodes"] = None
     params["explorer"]["demo"]["win_size"] = -1
-    params["explorer"]["demo"]["render"] = cpanel["render"]
+    params["explorer"]["demo"]["render"] = False # cpanel["render"]
     params["explorer"]["demo"]["render_delay"] = 0
     params["explorer"]["demo"]["seed"] = cpanel["seed"] + 50
     params["explorer"]["demo"]["extra_env_kwargs"] = {"mode":params["explorer"]["demo"]["mode"], "allow_demos":True}
