@@ -69,6 +69,7 @@ cpanel["cuda_deterministic"] = False # With TRUE we MIGHT get more deterministic
 
 #####################
 ### Memory Parameters
+cpanel["keep_old_checkpoints"] = False
 cpanel["memory_size_in_chunks"] = int(1e6)
 cpanel["demo_memory_size_in_chunks"] = int(1e6)
 
@@ -379,11 +380,19 @@ def gen_params(cpanel):
 
     params["memory"]["train"] = {}
     params["memory"]["train"]["type"] = "digideep.memory.ringbuffer.Memory"
-    params["memory"]["train"]["args"] = {"name":"train", "chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["memory_size_in_chunks"], "overrun":1}
+    params["memory"]["train"]["args"] = {"name":"train",
+                                         "keep_old_checkpoints":cpanel.get("keep_old_checkpoints", False),
+                                         "chunk_sample_len":cpanel["n_steps"],
+                                         "buffer_chunk_len":cpanel["memory_size_in_chunks"],
+                                         "overrun":1}
     
     params["memory"]["demo"] = {}
     params["memory"]["demo"]["type"] = "digideep.memory.ringbuffer.Memory"
-    params["memory"]["demo"]["args"] = {"name":"demo", "chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["demo_memory_size_in_chunks"], "overrun":1}
+    params["memory"]["demo"]["args"] = {"name":"demo",
+                                        "keep_old_checkpoints":cpanel.get("keep_old_checkpoints", False),
+                                        "chunk_sample_len":cpanel["n_steps"],
+                                        "buffer_chunk_len":cpanel["demo_memory_size_in_chunks"],
+                                        "overrun":1}
 
     ##############################################
 

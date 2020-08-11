@@ -71,7 +71,7 @@ cpanel["cuda_deterministic"] = False # With TRUE we MIGHT get more deterministic
 
 #####################
 ### Memory Parameters
-# cpanel["mempath"] = "/tmp"
+cpanel["keep_old_checkpoints"] = False
 cpanel["memory_size_in_chunks"] = int(1e5)
 cpanel["demo_memory_size_in_chunks"] = int(1e5)
 # SHOULD be 1 for on-policy methods that do not have a replay buffer.
@@ -405,14 +405,20 @@ def gen_params(cpanel):
     # buffer_chunk_len: Number of chunks in the buffer
 
     params["memory"]["train"] = {}
-    params["memory"]["train"]["type"] = "digideep.memory.ringbuffer_disk.Memory"
-    # params["memory"]["train"]["args"] = {"name":"train", "mempath":cpanel.get("mempath", "/tmp"), "chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["memory_size_in_chunks"], "overrun":1}
-    params["memory"]["train"]["args"] = {"name":"train", "chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["memory_size_in_chunks"], "overrun":1}
+    params["memory"]["train"]["type"] = "digideep.memory.ringbuffer.Memory"
+    params["memory"]["train"]["args"] = {"name":"train",
+                                         "keep_old_checkpoints":cpanel.get("keep_old_checkpoints", False),
+                                         "chunk_sample_len":cpanel["n_steps"],
+                                         "buffer_chunk_len":cpanel["memory_size_in_chunks"],
+                                         "overrun":1}
     
     params["memory"]["demo"] = {}
-    params["memory"]["demo"]["type"] = "digideep.memory.ringbuffer_disk.Memory"
-    # params["memory"]["demo"]["args"] = {"name":"demo", "mempath":cpanel.get("mempath", "/tmp"), "chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["demo_memory_size_in_chunks"], "overrun":1}
-    params["memory"]["demo"]["args"] = {"name":"demo", "chunk_sample_len":cpanel["n_steps"], "buffer_chunk_len":cpanel["demo_memory_size_in_chunks"], "overrun":1}
+    params["memory"]["demo"]["type"] = "digideep.memory.ringbuffer.Memory"
+    params["memory"]["demo"]["args"] = {"name":"demo",
+                                        "keep_old_checkpoints":cpanel.get("keep_old_checkpoints", False),
+                                        "chunk_sample_len":cpanel["n_steps"],
+                                        "buffer_chunk_len":cpanel["demo_memory_size_in_chunks"],
+                                        "overrun":1}
 
     # params["memory"]["replay"] = {}
     # params["memory"]["replay"]["type"] = "digideep.memory.ringbuffer.Memory"
