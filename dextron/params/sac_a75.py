@@ -90,6 +90,7 @@ cpanel["from_params"] = True
 # Environment parameters
 # cpanel["database_filename"] = "./workspace/parameters/session_20200622201351_youthful_pascal.csv"
 cpanel["database_filename"] = "./workspace/parameters/for-input/session_20200706062600_blissful_mcnulty.csv"
+# cpanel["database_filename"] = "./workspace/parameters/for-input/session_20200811120255_sharp_driscoll.csv"
 
 cpanel["extracts_path"] = "./workspace/extracts"
 
@@ -459,7 +460,7 @@ def gen_params(cpanel):
     params["explorer"]["test"]["n_steps"] = None # Do not limit # of steps
     params["explorer"]["test"]["n_episodes"] = cpanel["test_win_size"]
     params["explorer"]["test"]["win_size"] = cpanel["test_win_size"] # Extra episodes won't be counted
-    params["explorer"]["test"]["render"] = cpanel["render"]
+    params["explorer"]["test"]["render"] = False
     params["explorer"]["test"]["render_delay"] = 0
     params["explorer"]["test"]["seed"] = cpanel["seed"] + 100 # We want to make the seed of test environments different from training.
     params["explorer"]["test"]["extra_env_kwargs"] = {"mode":params["explorer"]["test"]["mode"], "allow_demos":False}
@@ -492,7 +493,7 @@ def gen_params(cpanel):
     params["explorer"]["demo"]["n_steps"] = cpanel["n_steps"] # Number of steps to take a step in the environment
     params["explorer"]["demo"]["n_episodes"] = None
     params["explorer"]["demo"]["win_size"] = -1
-    params["explorer"]["demo"]["render"] = False # cpanel["render"]
+    params["explorer"]["demo"]["render"] = cpanel["render"]
     params["explorer"]["demo"]["render_delay"] = 0
     params["explorer"]["demo"]["seed"] = cpanel["seed"] + 50
     params["explorer"]["demo"]["extra_env_kwargs"] = {"mode":params["explorer"]["demo"]["mode"], "allow_demos":True}

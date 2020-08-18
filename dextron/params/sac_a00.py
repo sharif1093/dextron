@@ -53,7 +53,7 @@ cpanel["test_interval"] = 10    # Test Interval Every #n Epochs
 cpanel["test_win_size"] = 10    # Number of episodes to run test.
 cpanel["save_interval"] = 50    # Save Interval Every #n Epochs
 ## Simulation will end when either time or max iterations exceed the following:
-cpanel["max_exec_time"] = 20     # hours
+cpanel["max_exec_time"] = None   # hours
 cpanel["max_exec_iter"] = None   # number of epochs
 
 
@@ -86,17 +86,18 @@ cpanel["from_params"] = True
 # Environment parameters
 # cpanel["database_filename"] = "./workspace/parameters/session_20200622201351_youthful_pascal.csv"
 cpanel["database_filename"] = "./workspace/parameters/for-input/session_20200706062600_blissful_mcnulty.csv"
+# cpanel["database_filename"] = "./workspace/parameters/for-input/session_20200811120255_sharp_driscoll.csv"
 
 cpanel["extracts_path"] = "./workspace/extracts"
 
-cpanel["generator_type"] = "real" # "simulated" # "real"
+cpanel["generator_type"] = "real" # "simulated" | "real"
 # cpanel["generator_type"] = "simulated"
 cpanel["time_limit"] = 10.0 # Set the maximum time here!
 cpanel["time_scale_offset"] = 0.5 # 1.0
 cpanel["time_scale_factor"] = 2.5 # 2.0
 cpanel["time_noise_factor"] = 0.8
-cpanel["time_staying_more"] = 20 # timesteps
-cpanel["reward_threshold"] = 1.0
+cpanel["time_staying_more"] = 20  # timesteps
+cpanel["reward_threshold"] = 1.0  # We are not interested in rewards < 1.0
 cpanel["control_timestep"] = 0.02 # "0.02" is a reasonable control_timestep. "0.04" is a reasonable fast-forward.
 cpanel["exclude_obs"] = []
 
@@ -119,7 +120,7 @@ cpanel["gamma"] = 0.99     # The gamma parameter used in VecNormalize | Agent.pr
 ### Exploration (~ num_workers * n_steps)
 cpanel["num_workers"] = 1     # From Explorer           # Number of exploratory workers working together
 cpanel["n_steps"] = 1         # From Explorer           # Number of frames to produce
-cpanel["render"] = False # In the test
+cpanel["render"] = False # In the demo
 ### Exploitation (~ n_update * batch_size)
 cpanel["n_update"] = 1        # From Agents: Updates per step
 cpanel["batch_size"] = 32     # From Agents
