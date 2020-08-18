@@ -198,6 +198,7 @@ class Hand(base.Task):
         filename = self.generator_args.get("database_filename", None)
 
         if filename and (self.generator_type == "real"):
+            # print("Reading trajectory parameters from file.")
             ## Use with raw csv files (r in [0,20] and 2 line headers)
             # data = pd.read_csv(filename, low_memory=False, header=1)
             # entry = data[data["r"]==20].sample(n=1, replace=True)
@@ -247,6 +248,8 @@ class Hand(base.Task):
             print("Loading from worker {} with r={}".format(entry["/worker"], entry["r"]))
             return params
         
+        # print("Randomizing parameters.")
+
         params = collections.OrderedDict()
         ############################################################################
         ## Setting up parameters: Those that will be stored in the "observations" ##
@@ -257,10 +260,6 @@ class Hand(base.Task):
         # t = 0.5
         params["parameters"]["initial_closure"] = self._random.rand()
         # self._random.rand(1).astype(np.float32)
-        # TODO: We may couple controller_gain and controller_thre. Because if threshold
-        #       is smaller the controller should be faster.
-        params["parameters"]["controller_gain"] = 1.00 + self._random.rand() * (10 - 1)     # _GRASPER_GAIN = 2
-        params["parameters"]["controller_thre"] = 0.01 + self._random.rand() * (0.90-0.01)
         
 
         ##################################################################
@@ -269,6 +268,11 @@ class Hand(base.Task):
         params["rand"] = collections.OrderedDict()
 
         if self.generator_type == "real":
+            # TODO: We may couple controller_gain and controller_thre. Because if threshold
+            #       is smaller the controller should be faster.
+            params["parameters"]["controller_gain"] = 1.00 + self._random.rand() * (10 - 1)     # _GRASPER_GAIN = 2
+            params["parameters"]["controller_thre"] = 0.01 + self._random.rand() * (0.90-0.01)
+            
             # self.environment_kwargs, self.generator_args
 
             # ### Storing values
@@ -286,6 +290,10 @@ class Hand(base.Task):
             params["rand"]["offset_noise_2d"] = np.array([offset_noise_x, offset_noise_y, 0], dtype = np.float64)
         
         elif self.generator_type == "simulated":
+            params["parameters"]["controller_gain"] = 2.00
+            params["parameters"]["controller_thre"] = 0.15
+
+            
             # NOTE: Don't start too close, give the agent some time.
             # theta = self._random.rand() * np.pi/7 + np.pi/7
             params["rand"]["radius"] = self._random.rand() * 0.35 + 0.25
