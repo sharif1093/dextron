@@ -14,7 +14,7 @@ from collections import OrderedDict
 
 
 #################################
-###           PRETEXT         ###
+###          PREAMBLE         ###
 #################################
 PUB_CAMERAS = False
 
@@ -44,7 +44,10 @@ cpanel["epoch_size"]    = 1000  # cycles
 cpanel["test_activate"] = False # Test Activate
 cpanel["test_interval"] = 10    # Test Interval Every #n Epochs
 cpanel["test_win_size"] = 10    # Number of episodes to run test.
-cpanel["save_interval"] = 10    # Save Interval Every #n Epochs
+cpanel["save_interval"] = 50    # Save Interval Every #n Epochs
+## Simulation will end when either time or max iterations exceed the following:
+cpanel["max_exec_time"] = None   # hours
+cpanel["max_exec_iter"] = None   # number of epochs
 
 
 cpanel["scheduler_start"] = 0.3
@@ -52,7 +55,7 @@ cpanel["scheduler_steps"] = cpanel["epoch_size"] * 100
 cpanel["scheduler_decay"] = 1.0 # Never reduce!
 # cpanel["scheduler_decay"] = .95
 # Using combined experience replay (CER) in the sampler.
-cpanel["use_cer"] = False
+cpanel["use_cer"] = False # This did not prove useful at all!
 
 cpanel["seed"] = 0
 cpanel["cuda_deterministic"] = False # With TRUE we MIGHT get more deterministic results but at the cost of speed.
@@ -65,23 +68,23 @@ if PUB_CAMERAS:
     cpanel["observation_key"] = "/camera"
 else:
     cpanel["observation_key"] = "/agent"
-
 cpanel["from_params"] = True
 
 # Environment parameters
 # cpanel["database_filename"] = "./workspace/parameters/session_20200622201351_youthful_pascal.csv"
 # cpanel["database_filename"] = "./workspace/parameters/for-input/session_20200706062600_blissful_mcnulty.csv"
+# cpanel["database_filename"] = "./workspace/parameters/for-input/session_20200811120255_sharp_driscoll.csv"
 cpanel["database_filename"] = None
 
 cpanel["extracts_path"] = "./workspace/extracts"
 
-cpanel["generator_type"] = "real" # "simulated" # "real"
-cpanel["time_limit"] = 10.0  # Set the maximum time here!
+cpanel["generator_type"] = "real" # "simulated" | "real"
+cpanel["time_limit"] = 10.0 # Set the maximum time here!
 cpanel["time_scale_offset"] = 0.5 # 1.0
 cpanel["time_scale_factor"] = 2.5 # 2.0
 cpanel["time_noise_factor"] = 0.8
 cpanel["time_staying_more"] = 20  # timesteps
-cpanel["reward_threshold"] = 1.0  # We are not interested in rewards < 5.0
+cpanel["reward_threshold"] = 1.0  # We are not interested in rewards < 1.0
 cpanel["control_timestep"] = 0.02 # "0.02" is a reasonable control_timestep. "0.04" is a reasonable fast-forward.
 
 cpanel["gamma"] = 0.99     # The gamma parameter used in VecNormalize | Agent.preprocess | Agent.step
@@ -192,6 +195,8 @@ def gen_params(cpanel):
     #####################################
     params["runner"] = {}
     params["runner"]["name"] = cpanel.get("runner_name", "digideep.pipeline.Runner")
+    params["runner"]["max_time"] = cpanel.get("max_exec_time", None)
+    params["runner"]["max_iter"] = cpanel.get("max_exec_iter", None)
     params["runner"]["n_cycles"] = cpanel["epoch_size"]    # Meaning that 100 cycles are 1 epoch.
     params["runner"]["n_epochs"] = cpanel["number_epochs"] # Testing and savings are done after each epoch.
     params["runner"]["randargs"] = {'seed':cpanel["seed"], 'cuda_deterministic':cpanel["cuda_deterministic"]}
