@@ -32,7 +32,9 @@ class Trajectory:
 
 
 
-
+#####################################################################
+### Real trajectories ###
+#########################
 class RealTrajectory(Trajectory):
     # def __init__(self, environment_kwargs, generator_kwargs):
     #     Trajectory.__init__(self, environment_kwargs, generator_kwargs)
