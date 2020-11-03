@@ -175,7 +175,16 @@ class CNNBlock(nn.Module):
         # self.linear = init_(nn.Linear(32 * 7 * 11, output_size))
         self.relu5 = nn.ReLU()
     def forward(self, inputs):
+        # Pixel Normalization: scale pixel values to the range 0-1.
+        # Pixel Centering: scale pixel values to have a zero mean.
+        # Pixel Standardization: scale pixel values to have a zero mean and unit variance.
+        # sample_wise  /  feature_wise
+        # https://machinelearningmastery.com/how-to-normalize-center-and-standardize-images-with-the-imagedatagenerator-in-keras/
+
+        # TODO: Normalization or Batch Normalization should be used to zero the mean.
+        # x = (inputs.float()/255. - 0.0635) / 0.0635
         x = inputs.float()/255.
+        # x = inputs.float()
         ## Inspect x.shape && x.dtype
         # print("input size =", x.shape)
         x = self.relu1(self.conv1(x))
