@@ -169,10 +169,62 @@ class AgentSchedule(AgentBase):
             batch = self.sample()
         if batch is None:
             return
+        
+
+
+
+        ## Sequence of images as stacking
+        #
+        # shape = batch["/observations/camera"][0].shape
+        # self.session.writer.add_images(tag=self.params["name"]+"_images", 
+        #                                img_tensor=batch["/observations/camera"][0].reshape(shape[0],1,shape[1],shape[2]),
+        #                                global_step=self.state['i_step'],
+        #                                dataformats='NCHW')
+        #
+
+        # self.session.writer.add_images(tag=self.params["name"]+"_images", 
+        #                                img_tensor=batch["/observations/camera"][:,1:,:,:],
+        #                                global_step=self.state['i_step'],
+        #                                dataformats='NCHW')
+        
+        # print("1. RAW AVERAGE OF OUR FIRST INSTANCE:", np.mean(batch["/observations/camera"][0]), "|     STD:", np.std(batch["/observations/camera"][0]))
+        
+        # print("2. RAW AVERAGE OF OUR FIRST INSTANCE:", np.mean(batch["/observations/camera"]/255.), "|     STD:", np.std(batch["/observations/camera"]/255.))
+
+        # print(batch["/observations/camera"][0])
+        # print("\n\n\n")
+        
+        # batch["/observations/camera"][:,1:,:,:] vs batch["/observations/camera"][:,:3,:,:]
+        # Thesecond shows complete black at the very first frame since frame-stacking stackes with zero frames.
+        # The first one should always show something.
+        #
+        ## Sequence of images as channels
+        # a1 = batch["/observations/camera"][0].reshape(1, *shape)
+        # a2 = batch["/observations/camera_2"][0].reshape(1, *shape)
+        # c = np.concatenate([a1,a2])
+        # self.session.writer.add_images(tag=self.params["name"]+"_images_0", 
+        #                               img_tensor=c[:,:3,:,:],
+        #                               global_step=self.state['i_step'],
+        #                               dataformats='NCHW')
+        #
+        # self.session.writer.add_image(tag=self.params["name"]+"_images_1", 
+        #                               img_tensor=batch["/observations/camera_2"][1].reshape(1, *shape),
+        #                               global_step=self.state['i_step'],
+        #                               dataformats='CHW')
+
+        # batch["/observations/camera"]   = (batch["/observations/camera"]   - 16.4) / 17.0
+        # batch["/observations/camera_2"] = (batch["/observations/camera_2"] - 16.4) / 17.0
+
         with KeepTime("fetch"):
             state, action, reward, next_state, masks = self.fetch(batch)
+        
         self.calculate_loss(state, action, reward, next_state, masks)
         self.state["i_step"] += 1
+
+        ## Sending visualizations to Tensorboard
+        # self.session.writer.add_scalar('loss/actor', actor_loss.item(), self.state["i_step"])
+        # self.session.writer.add_scalar('loss/softq', softq_loss.item(), self.state["i_step"])
+        # self.session.writer.add_scalar('loss/value', value_loss.item(), self.state["i_step"])
 
 
     def update(self):
