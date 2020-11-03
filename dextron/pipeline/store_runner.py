@@ -3,20 +3,19 @@ from digideep.utility.profiling import KeepTime
 from digideep.utility.logging import logger
 import gc, time
 
-
-class RandomRunner (Runner):
+class StoreRunner (Runner):
     def train(self):
         try:
-            while self.state["i_epoch"] < self.params["runner"]["n_epochs"] and not self.termination_check():
+            self.explorer["train"].reset()
+
+            while (self.state["i_epoch"] < self.params["runner"]["n_epochs"]) and not self.termination_check():
                 self.state["i_cycle"] = 0
                 while self.state["i_cycle"] < self.params["runner"]["n_cycles"]:
                     with KeepTime("/"):
-                        self.explorer["demo"].update()
-
-                        # # Update Agent
-                        # for agent_name in self.agents:
-                        #     with KeepTime(agent_name):
-                        #         self.agents[agent_name].update()
+                        with KeepTime("train"):
+                            chunk = self.explorer["train"].update()
+                            with KeepTime("store"):
+                                self.memory["train"].store(chunk)
 
                     self.state["i_cycle"] += 1
                 # End of Cycle
