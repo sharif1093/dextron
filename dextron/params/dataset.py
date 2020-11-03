@@ -38,27 +38,34 @@ cpanel = OrderedDict()
 #####################
 ### Runner Parameters
 # num_frames = 10e6  # Number of frames to train
-cpanel["runner_name"]   = "dextron.pipeline.random_runner.RandomRunner"
-cpanel["number_epochs"] = 15000  # epochs
+cpanel["runner_name"]   = "dextron.pipeline.dataset_runner.DatasetRunner"
+cpanel["number_epochs"] = 1000  # epochs
 cpanel["epoch_size"]    = 1000  # cycles
 cpanel["test_activate"] = False # Test Activate
 cpanel["test_interval"] = 10    # Test Interval Every #n Epochs
 cpanel["test_win_size"] = 10    # Number of episodes to run test.
-cpanel["save_interval"] = 50    # Save Interval Every #n Epochs
+cpanel["save_interval"] = 100    # Save Interval Every #n Epochs
 ## Simulation will end when either time or max iterations exceed the following:
 cpanel["max_exec_time"] = None   # hours
 cpanel["max_exec_iter"] = None   # number of epochs
 
 
-cpanel["scheduler_start"] = 0.3
-cpanel["scheduler_steps"] = cpanel["epoch_size"] * 100
-cpanel["scheduler_decay"] = 1.0 # Never reduce!
-# cpanel["scheduler_decay"] = .95
-# Using combined experience replay (CER) in the sampler.
-cpanel["use_cer"] = False # This did not prove useful at all!
+# cpanel["scheduler_start"] = 0.3
+# cpanel["scheduler_steps"] = cpanel["epoch_size"] * 100
+# cpanel["scheduler_decay"] = 1.0 # Never reduce!
+# # cpanel["scheduler_decay"] = .95
+# # Using combined experience replay (CER) in the sampler.
+# cpanel["use_cer"] = False # This did not prove useful at all!
 
 cpanel["seed"] = 0
 cpanel["cuda_deterministic"] = False # With TRUE we MIGHT get more deterministic results but at the cost of speed.
+
+#####################
+### Memory Parameters
+cpanel["keep_old_checkpoints"] = False
+# cpanel["demo_memory_size_in_chunks"] = 
+# SHOULD be 1 for on-policy methods that do not have a replay buffer.
+# SUGGESTIONS: 2^0 (~1e0) | 2^3 (~1e1) | 2^7 (~1e2) | 2^10 (~1e3) | 2^13 (~1e4) | 2^17 (1e5) | 2^20 (~1e6)
 
 ##########################
 ### Environment Parameters
@@ -74,9 +81,10 @@ cpanel["controller_gain"] = 2.0
 
 # Environment parameters
 # cpanel["database_filename"] = "./workspace/parameters/session_20200622201351_youthful_pascal.csv"
-# cpanel["database_filename"] = "./workspace/parameters/for-input/session_20200706062600_blissful_mcnulty.csv"
+cpanel["database_filename"] = "./workspace/parameters/for-input/session_20200706062600_blissful_mcnulty.csv"
 # cpanel["database_filename"] = "./workspace/parameters/for-input/session_20200811120255_sharp_driscoll.csv"
-cpanel["database_filename"] = None
+# "./workspace/parameters/for-input/session_20201003224318_naughty_brattain.csv"
+# cpanel["database_filename"] = None
 
 cpanel["extracts_path"] = "./workspace/extracts"
 
@@ -152,9 +160,9 @@ def gen_params(cpanel):
     #                             enabled=True))
 
     # Normalizing actions (to be in [-1, 1])
-    norm_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.WrapperNormalizeActDict",
-                              args={"paths":["agent"]},
-                              enabled=False))
+    # norm_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.WrapperNormalizeActDict",
+    #                           args={"paths":["agent"]},
+    #                           enabled=False))
 
     ##############################################
     ### Vector Wrappers ###
@@ -162,24 +170,24 @@ def gen_params(cpanel):
     vect_wrappers = []
     
     # Normalizing rewards
-    vect_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.VecNormalizeRew",
-                              args={"clip":5, # 10
-                                    "gamma":cpanel["gamma"],
-                                    "epsilon":1e-8
-                              },
-                              enabled=False)) # Not a good idea to normalize sparse rewards.
+    # vect_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.VecNormalizeRew",
+    #                           args={"clip":5, # 10
+    #                                 "gamma":cpanel["gamma"],
+    #                                 "epsilon":1e-8
+    #                           },
+    #                           enabled=False)) # Not a good idea to normalize sparse rewards.
     
 
     # Log successful parameter sets for the expert policy
-    vect_wrappers.append(dict(name="dextron.wrappers.success_logger.VecSuccessLogger",
-                              request_for_args=["session_state"],
-                              args={"threshold": cpanel["reward_threshold"], # Remove only zero-rewards
-                                    "interval": 100, # How many episodes to print the log report?
-                                    "num_workers": cpanel["num_workers"],
-                                    "info_keys": ["/rand"],
-                                    "obs_keys": ["/parameters"]
-                              },
-                              enabled=True))
+    # vect_wrappers.append(dict(name="dextron.wrappers.success_logger.VecSuccessLogger",
+    #                           request_for_args=["session"],
+    #                           args={"threshold": cpanel["reward_threshold"], # Remove only zero-rewards
+    #                                 "interval": 100, # How many episodes to print the log report?
+    #                                 "num_workers": cpanel["num_workers"],
+    #                                 "info_keys": ["/rand"],
+    #                                 "obs_keys": ["/parameters"]
+    #                           },
+    #                           enabled=True))
 
     ##############################################
     params["env"]["main_wrappers"] = {"Monitor":{"allow_early_resets":True, # We need it to allow early resets in the test environment.
@@ -227,6 +235,14 @@ def gen_params(cpanel):
     # ### Memory ###
     # ##############
     params["memory"] = {}
+    
+    params["memory"]["demo"] = {}
+    params["memory"]["demo"]["type"] = "digideep.memory.ringbuffer.Memory"
+    params["memory"]["demo"]["args"] = {"name":"demo",
+                                        "keep_old_checkpoints":cpanel.get("keep_old_checkpoints", False),
+                                        "chunk_sample_len":cpanel["n_steps"],
+                                        "buffer_chunk_len":cpanel["number_epochs"] * cpanel["epoch_size"],
+                                        "overrun":1}
 
     
     

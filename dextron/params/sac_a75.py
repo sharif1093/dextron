@@ -48,11 +48,10 @@ cpanel = OrderedDict()
 cpanel["runner_name"]   = "dextron.pipeline.replay_runner.PlaybackRunner"
 cpanel["number_epochs"] = 10000 # epochs
 cpanel["epoch_size"]    = 1000  # cycles
-cpanel["test_activate"] = True  # Test activated
-cpanel["test_interval"] = 10    # Test Interval Every #n Epochs
+cpanel["test_activate"] = True  # Test Activated
 cpanel["test_win_size"] = 10    # Number of episodes to run test.
-cpanel["save_interval"] = 100
-# cpanel["number_epochs"] // 5  # Save Interval Every #n Epochs
+cpanel["test_interval"] = 10    # Test Interval Every #n Epochs
+cpanel["save_interval"] = 100   # Save Interval Every #n Epochs
 ## Simulation will end when either time or max iterations exceed the following:
 cpanel["max_exec_time"] = None  # hours
 cpanel["max_exec_iter"] = None  # number of epochs
@@ -64,7 +63,7 @@ cpanel["scheduler_steps"] = cpanel["epoch_size"] * 100
 cpanel["scheduler_decay"] = 1.0 # Never reduce!
 # cpanel["scheduler_decay"] = .95
 # Using combined experience replay (CER) in the sampler.
-cpanel["use_cer"] = False # This did not prove useful at all!
+# cpanel["use_cer"] = False # This did not prove useful at all!
 
 cpanel["seed"] = 0
 cpanel["cuda_deterministic"] = False # With TRUE we MIGHT get more deterministic results but at the cost of speed.
@@ -88,20 +87,21 @@ else:
 cpanel["from_params"] = True
 
 # Environment parameters
+cpanel["generator_type"] = "simulated" # "real" | "simulated"
+# Real trajectory parameters
 # cpanel["database_filename"] = "./workspace/parameters/session_20200622201351_youthful_pascal.csv"
 cpanel["database_filename"] = "./workspace/parameters/for-input/session_20200706062600_blissful_mcnulty.csv"
 # cpanel["database_filename"] = "./workspace/parameters/for-input/session_20200811120255_sharp_driscoll.csv"
 
 cpanel["extracts_path"] = "./workspace/extracts"
 
-cpanel["generator_type"] = "real" # "simulated" # "real"
-# cpanel["generator_type"] = "simulated"
-cpanel["time_limit"] = 10.0 # Set the maximum time here!
 cpanel["time_scale_offset"] = 0.5 # 1.0
-cpanel["time_scale_factor"] = 2.5 # 2.0
-cpanel["time_noise_factor"] = 0.8
-cpanel["time_staying_more"] = 20 # timesteps
+cpanel["time_scale_factor"] = 2.5 # 2.5
+cpanel["time_noise_factor"] = 0.2 # 0.8
 cpanel["reward_threshold"] = 1.0
+# Shared Parameters
+cpanel["time_limit"] = 6.0 # Set the maximum time here!
+cpanel["time_staying_more"] = 20 # timesteps
 cpanel["control_timestep"] = 0.02 # "0.02" is a reasonable control_timestep. "0.04" is a reasonable fast-forward.
 cpanel["exclude_obs"] = []
 
@@ -127,7 +127,7 @@ cpanel["n_steps"] = 1         # From Explorer           # Number of frames to pr
 cpanel["render"] = False # In the test
 ### Exploitation (~ n_update * batch_size)
 cpanel["n_update"] = 1        # From Agents: Updates per step
-cpanel["batch_size"] = 32     # From Agents
+cpanel["batch_size"] = 128    # From Agents
 cpanel["warm_start"] = 10000
 # cpanel["demo_use_ratio"] = 0.3 #  %rur of training data comes from the "replay", where (100-%rur) comes from the "train"
 # cpanel["replay_use_ratio"] = 0.3 #  %rur of training data comes from the "replay", where (100-%rur) comes from the "train"
@@ -136,7 +136,7 @@ cpanel["warm_start"] = 10000
 
 #####################
 ### Agents Parameters
-cpanel["agent_type"] = "dextron.agent.sac.a75.agent_qv.Agent"
+cpanel["agent_type"] = "dextron.agent.sac.a75.agent_q.Agent"
 # Choices: "dextron.agent.sac.a75.agent_q.Agent" | agent_qv | agent_qvp
 cpanel["lr_value"] = 3e-4
 cpanel["lr_softq"] = 3e-4
@@ -180,7 +180,7 @@ def gen_params(cpanel):
                        "generator_args":{"time_scale_offset":cpanel["time_scale_offset"],
                                          "time_scale_factor":cpanel["time_scale_factor"],
                                          "time_noise_factor":cpanel["time_noise_factor"],
-                                         "time_staying_more":cpanel["time_staying_more"], # timesteps
+                                         "time_staying_more":cpanel["time_staying_more"], # timesteps. Only this is for reward engineering
                                          "extracts_path":cpanel["extracts_path"],
                                          "database_filename":cpanel["database_filename"]},
                        "random":None,
@@ -230,23 +230,17 @@ def gen_params(cpanel):
                                         "nstack":4, # By DQN Nature paper, it is called: phi length
                                         "axis":0},  # Axis=0 is required when ImageTransposeWrapper is called on the Atari games.
                                 enabled=True))
-
-        # vect_wrappers.append(dict(name="digideep.environment.wrappers.vector.VecFrameStackAxis",
-        #                         args={"path":"/depth",
-        #                                 "nstack":4, # By DQN Nature paper, it is called: phi length
-        #                                 "axis":0},  # Axis=0 is required when ImageTransposeWrapper is called on the Atari games.
-        #                         enabled=True))
     # Normalizing observations
     if not PUB_CAMERAS:
         vect_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.VecNormalizeObsDict",
                                 args={"paths":[cpanel["observation_key"]],
-                                        "clip":10, # 5 or 10?
+                                        "clip":5, # 5 or 10?
                                         "epsilon":1e-8
                                 },
                                 enabled=True))
     # Normalizing rewards
     vect_wrappers.append(dict(name="digideep.environment.wrappers.normalizers.VecNormalizeRew",
-                              args={"clip":10, # 5 or 10?
+                              args={"clip":5, # 5 or 10?
                                     "gamma":cpanel["gamma"],
                                     "epsilon":1e-8
                               },
@@ -320,8 +314,7 @@ def gen_params(cpanel):
                                                  "scheduler_steps":cpanel["scheduler_steps"],
                                                  "scheduler_decay":cpanel["scheduler_decay"],
                                                  "batch_size_dict":{"train":None, "demo":None},
-                                                 "observation_path":params["agents"]["agent"]["observation_path"],
-                                                 "use_cer":cpanel["use_cer"]
+                                                 "observation_path":params["agents"]["agent"]["observation_path"]
                                                 }
 
 #     replay_batch_size = int(cpanel["replay_use_ratio"] * cpanel["batch_size"])
@@ -345,7 +338,7 @@ def gen_params(cpanel):
     params["agents"]["agent"]["policyargs"] = {"obs_space": params["env"]["config"]["observation_space"][observation_path],
                                                "act_space": params["env"]["config"]["action_space"][agent_name],
                                                "image_repr_type": cpanel["image_repr_type"], # cnn | coordconv
-                                               "image_repr_size": 80,
+                                               "image_repr_size": 96,
                                                "value_args": {"hidden_size": cpanel["hidden_size_value"], "init_w":0.003},
                                                "softq_args": {"hidden_size": cpanel["hidden_size_softq"], "init_w":0.003},
                                                "actor_args": {"hidden_size": cpanel["hidden_size_actor"], "init_w":0.003, "log_std_min":-20, "log_std_max":2},
@@ -361,8 +354,6 @@ def gen_params(cpanel):
     # params["agents"]["agent"]["noiseargs"] = {"mu":0, "theta":0.15, "sigma":cpanel["noise_std"], "lim":lim}
     # # params["agents"]["agent"]["noiseargs"] = {"mu":0, "theta":0.15, "sigma":1}
 
-    # params["agents"]["agent"]["optimname_image"] = "torch.optim.Adam"
-    # params["agents"]["agent"]["optimargs_image"] = {"lr":cpanel["lr_value"]}   # , "eps":cpanel["eps"]
     
     params["agents"]["agent"]["optimname_value"] = "torch.optim.Adam"
     params["agents"]["agent"]["optimargs_value"] = {"lr":cpanel["lr_value"]}   # , "eps":cpanel["eps"]
