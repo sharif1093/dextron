@@ -12,9 +12,9 @@ from digideep.pipeline.session import writers
 from copy import deepcopy
 
 class VecSuccessLogger(VecEnvWrapper):
-    def __init__(self, venv, mode, session, threshold=0., interval=100, info_keys=["/rand"], obs_keys=["/parameters"], num_workers=None):
+    def __init__(self, venv, mode, session_state=None, threshold=0., interval=100, info_keys=["/rand"], obs_keys=["/parameters"], num_workers=None):
         VecEnvWrapper.__init__(self, venv)
-        self.session = session
+        self.session_state = session_state
         
         self.eprets = None
         self.eplens = None
@@ -24,8 +24,9 @@ class VecSuccessLogger(VecEnvWrapper):
         self.infos = None
         self.obs = None
 
-        if self.session:
-            self.filename = self.session.state['path_session']
+        if self.session_state:
+            self.filename = self.session_state['path_session']
+            # print(">>>> Success filename set to:", self.filename)
         else:
             self.filename = ""
 
@@ -204,9 +205,9 @@ class VecSuccessLogger(VecEnvWrapper):
             # Plot histograms
             for h in self.stats["histogram"]:
                 self.stats["histogram"][h].plot()
-            
 
-            
+
+
             writers[0].add_histogram("Offset Noise X", np.array(self.stats["scatter"]["offset_noise_2d"][0]), global_step=self.stats["episodes"])
             writers[0].add_histogram("Offset Noise Y", np.array(self.stats["scatter"]["offset_noise_2d"][1]), global_step=self.stats["episodes"])
             writers[0].add_histogram("Reward", np.array(self.stats["scatter"]["r"]), global_step=self.stats["episodes"])
