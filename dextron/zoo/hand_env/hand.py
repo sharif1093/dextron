@@ -25,6 +25,7 @@ from dm_env import specs
 from dm_control.suite import base
 # from dm_control.suite.utils import randomizers
 from dm_control.utils import rewards
+from dm_control.mujoco.wrapper.mjbindings import enums
 
 from dextron.zoo.hand_env.myquaternion import *
 
@@ -172,15 +173,26 @@ class Hand(base.Task):
         self.generator_args = self.params.get("generator_args")
         self.generator_type = self.params.get("generator_type")
 
-        
+        self.reward_type = self.params.get("reward_type", "reward/20")
+        if self.reward_type == "reward/20":
+            print(">> [hand.py] Using reward/20 system.")
+            self.get_reward = self.get_reward20
+        elif self.reward_type == "reward/44":
+            print(">> [hand.py] Using reward/44 system.")
+            self.get_reward = self.get_reward44
+
+
         self.mode = None
         self.termination = False
+        self.episode = 0
+        self.counter = 0
+        # reward20 variables
         self.n_rewards = 0
         self.physics_time = None
         self.initial_mocap_height = 0
-        self.episode = 0
-        self.counter = 0
 
+        # contacts
+        self.max_ncon = self.params.get("max_ncon", 15)
 
         self.parameters = collections.OrderedDict()
         self.infos = collections.OrderedDict()
@@ -212,8 +224,8 @@ class Hand(base.Task):
             ## Using pandas sample method. Not desiarable due to reproducibility.
             # entry = data.sample(n=1, replace=True)
             # entry = entry.to_dict('records')[0]
-            ## Using self._random alternatively.
-            entry = data.iloc[self._random.randint(len(data))].to_dict()
+            ## Using self.np_random alternatively.
+            entry = data.iloc[self.np_random.randint(len(data))].to_dict()
 
             params = collections.OrderedDict()
             params["parameters"] = collections.OrderedDict()
@@ -227,8 +239,8 @@ class Hand(base.Task):
                 if k.startswith("/rand/"):
                     k_ = k[len("/rand/"):]
                     params["rand"][k_] = entry[k]
-            
-            
+        
+
             # print(params["parameters"].keys())
             # Modifying some keys.
             # '/rand/offset_noise_2d'
@@ -258,9 +270,11 @@ class Hand(base.Task):
         # Recording all random parameters
         # Start half-closed
         # t = 0.5
-        params["parameters"]["initial_closure"] = self._random.rand()
-        # self._random.rand(1).astype(np.float32)
-        
+        ###### params["parameters"]["initial_closure"] = self.np_random.rand()
+        params["parameters"]["initial_closure"] = 0.5
+        # self.np_random.rand(1).astype(np.float32)
+
+
 
         ##################################################################
         ## Setting up randoms: Those that will be stored in the "infos" ##
@@ -270,8 +284,19 @@ class Hand(base.Task):
         if self.generator_type == "real":
             # TODO: We may couple controller_gain and controller_thre. Because if threshold
             #       is smaller the controller should be faster.
-            params["parameters"]["controller_gain"] = 1.00 + self._random.rand() * (10 - 1)     # _GRASPER_GAIN = 2
-            params["parameters"]["controller_thre"] = 0.01 + self._random.rand() * (0.90-0.01)
+            # params["parameters"]["controller_gain"] = 1.00 + self.np_random.rand() * (10 - 1)     # _GRASPER_GAIN = 2
+            # params["parameters"]["controller_gain"] = self.params.get("controller_gain", 2.00)
+            
+            # For backward-compatibility:
+            controller_gain = self.params.get("controller_gain", [1.,10.])
+            if isinstance(controller_gain, list):
+                params["parameters"]["controller_gain"] = controller_gain[0] + self.np_random.rand() * (controller_gain[1] - controller_gain[0])
+            elif isinstance(controller_gain, int) or isinstance(controller_gain, float):
+                params["parameters"]["controller_gain"] = float(controller_gain)
+            else:
+                raise Exception("Unknown type for 'controller_gain'.")
+            
+            params["parameters"]["controller_thre"] = 0.01 + self.np_random.rand() * (0.90-0.01)
             
             # self.environment_kwargs, self.generator_args
 
@@ -279,39 +304,32 @@ class Hand(base.Task):
             extracts_path = self.generator_args["extracts_path"]
             extracts_path_jsons = os.path.join(extracts_path, "*.json")
             all_samples = sorted(glob.glob(extracts_path_jsons))
-            filename = self._random.choice(all_samples, replace=True) # uniformly sampled
+            filename = self.np_random.choice(all_samples, replace=True) # uniformly sampled
             base_filename, _ = os.path.splitext(os.path.basename(filename))
             params["rand"]["filename"] = base_filename
 
-            params["rand"]["time_noise_normal"] = self._random.normal(scale=1)
-            # self._random.normal(size=(1,),scale=1).astype(np.float32)
-            offset_noise_x = -0.06 + self._random.rand() * (0.06 - (-0.06))
-            offset_noise_y = -0.06 + self._random.rand() * (0.06 - (-0.06))
+            params["rand"]["time_noise_normal"] = self.np_random.normal(scale=1)
+            # self.np_random.normal(size=(1,),scale=1).astype(np.float32)
+            offset_noise_x = -0.06 + self.np_random.rand() * (0.06 - (-0.06))
+            offset_noise_y = -0.06 + self.np_random.rand() * (0.06 - (-0.06))
             params["rand"]["offset_noise_2d"] = np.array([offset_noise_x, offset_noise_y, 0], dtype = np.float64)
         
         elif self.generator_type == "simulated":
-            params["parameters"]["controller_gain"] = 2.00
+            params["parameters"]["controller_gain"] = self.params.get("controller_gain", 2.00)
             params["parameters"]["controller_thre"] = 0.15
 
-            
+
+
             # NOTE: Don't start too close, give the agent some time.
-            # theta = self._random.rand() * np.pi/7 + np.pi/7
-            params["rand"]["radius"] = self._random.rand() * 0.35 + 0.25
-            params["rand"]["theta"] = self._random.rand() * np.pi/14 + np.pi/14
-            params["rand"]["ex"] = -0.045 # + 0.020 * (2*self._random.rand()-1)
+            # theta = self.np_random.rand() * np.pi/7 + np.pi/7
+            params["rand"]["radius"] = self.np_random.rand() * 0.35 + 0.25
+            params["rand"]["theta"] = self.np_random.rand() * np.pi/14 + np.pi/14
+            params["rand"]["ex"] = -0.045 # + 0.020 * (2*self.np_random.rand()-1)
             params["rand"]["ey"] = -0.10
-            # ex = -0.05  + 0.020 * (2*self._random.rand()-1)
-            # ey = -0.095 + 0.020 * (2*self._random.rand()-1)
-            params["rand"]["ez"] = 0.10 + 0.020 * (2*self._random.rand()-1)
-
-        #################################
-        
-
+            # ex = -0.05  + 0.020 * (2*self.np_random.rand()-1)
+            # ey = -0.095 + 0.020 * (2*self.np_random.rand()-1)
+            params["rand"]["ez"] = 0.10 + 0.020 * (2*self.np_random.rand()-1)
         return params
-
-
-
-
 
 
 
@@ -334,10 +352,10 @@ class Hand(base.Task):
         self.n_rewards = 0
         self.episode += 1
         if self.allow_demos:
-            # print(">>>> TEACHING in explorer [{}].".format(self.explorer_mode))
+            print(">>>> TEACHING in explorer [{}].".format(self.explorer_mode))
             self.mode = "teaching"
         else:
-            # print(">>>> TRAINING in explorer [{}].".format(self.explorer_mode))
+            print(">>>> TRAINING in explorer [{}].".format(self.explorer_mode))
             self.mode = "training"
 
         # Setting up robot grasp controller
@@ -420,15 +438,18 @@ class Hand(base.Task):
         self.infos = collections.OrderedDict()
         self.infos["rand"] = params["rand"]
         self.infos["rand"].update(trajectory.parameters)
-        
-        # print(">>>> ", self.parameters)
-        # print("--------")
-        # print(">>>> ", self.infos["rand"])
-        # print()
+
         
         # https://arxiv.org/pdf/1801.00690.pdf
         physics.reset_context()
         self.initial_mocap_height = physics.named.data.mocap_pos['mocap', 'z']
+
+
+        ##############
+        ## CONTACTS ##
+        ##############
+        self.body_ids = set(physics.model.geom_bodyid)
+        # print("Name of body_ids:", [(i,physics.model.id2name(i, 'body')) for i in self.body_ids])
         super(Hand, self).initialize_episode(physics)
 
         
@@ -495,7 +516,7 @@ class Hand(base.Task):
         self.mocap_controller.step(physics)
         if self.mocap_controller.termination:
             self.termination = True
-        
+
 
 
 
@@ -533,10 +554,7 @@ class Hand(base.Task):
         # offset_local_mocap_rotated = quatTrans(quatConj(q), offset_local_mocap)
         # # print("++++++ Difference between palm_center and mocap:", np.linalg.norm(xp - (x + offset_local_mocap_rotated)))
         # # print("++++++ Quat diff between palm_center and base:", np.linalg.norm(q-q_base))
-        # # print("")
-        # #
-        # # "xmat" format: [xx, xy, xz, yx, yy, yz, zx, zy, zz]
-        # xmat = physics.named.data.site_xmat["palm_center"]
+        # # print("")obs['info'] = self.infoster"]
         # # print( np.linalg.norm(physics.named.data.xmat["mocap"] - physics.named.data.site_xmat["palm_center"]) )
         # #
         # #
@@ -615,8 +633,17 @@ class Hand(base.Task):
         if not "closure" in self.exclude_obs:
             obs["agent"]["closure"] = physics.get_hand_closure()
         
-        if not "timestep" in self.exclude_obs:
-            obs["agent"]["timestep"] = np.array( physics.time() / self.environment_kwargs["control_timestep"] )
+        # if not "timestep" in self.exclude_obs:
+        #     obs["agent"]["timestep"] = np.array( physics.time() / self.environment_kwargs["control_timestep"] )
+
+        ## In order to store intact observation when rolling out the policies.
+        # obs["excluded"] = collections.OrderedDict()
+        # obs["excluded"]['position'] = physics.data.qpos[:].copy()
+        # obs["excluded"]['velocity'] = physics.data.qvel[:].copy()
+        # obs["excluded"]["rel_obj_hand"] = physics.data.mocap_pos[:].copy() - physics.named.data.xpos['long_cylinder'].copy()
+        # obs["excluded"]["rel_obj_hand_dist"] = np.linalg.norm(physics.data.mocap_pos[:].copy() - physics.named.data.xpos['long_cylinder'].copy())
+        # obs["excluded"]["distance2"] = physics.get_distance_in_xy_plane()
+        # obs["excluded"]["closure"] = physics.get_hand_closure()
 
 
         #############################
@@ -671,20 +698,15 @@ class Hand(base.Task):
         
 
 
-        # 
         # print("position shape:", obs["agent"]['position'].shape)
         # print("velocity shape:", obs["agent"]['velocity'].shape)
         # print(physics.named.data.qpos)
         # print("--------------------------")
         # print(physics.named.data.qvel)
 
-        # exit()
-        
 
 
-
-        
-        # AGEN: (90, 4, 60, 80)
+        # AGEN: (90, 4, 60, 80)body_ids
         # DEMO: (38, 4, 60, 80)
         # batch_size = 128
 
@@ -692,6 +714,32 @@ class Hand(base.Task):
         # TODO: Relative object/hand velocity
 
         # # obs['touch'] = physics.touch()
+
+
+
+        #############################
+        ## CONTACTS ##
+        ##############
+        # Name of all pairing contacts: [physics.model.id2name(physics.model.geom_bodyid[kk], 'body') for kk in physics.data.contact.geom1]
+        # Name of all elements in the contact: print(f"{physics.data.contact.dtype.names}")
+        # Get the important information about contacts: print(f"{physics.data.ncon}: g1{physics.data.contact.geom1}, g2{physics.data.contact.geom2}, e{physics.data.contact.exclude}")
+        # Number of contacts: physics.data.ncon
+        # Get the name of all bodies: print([(i,physics.model.id2name(i, 'body')) for i in physics.model.geom_bodyid])
+
+        obs["contacts"] = np.full(shape=(self.max_ncon,2), fill_value=-1, dtype=np.uint8)
+        body1 = [physics.model.geom_bodyid[kk] for kk in physics.data.contact.geom1]
+        body2 = [physics.model.geom_bodyid[kk] for kk in physics.data.contact.geom2]
+        contacts = np.array(list(set(list(zip(body1,body2)))), dtype=np.uint8)
+        ncon = contacts.shape[0]
+
+        if ncon==0:
+            pass
+        elif ncon <= self.max_ncon:
+            obs["contacts"][:ncon,:] = contacts
+        else:
+            obs["contacts"] = contacts[:self.max_ncon,:]
+
+
         
         #############################
         ### demonstrator ###
@@ -711,7 +759,7 @@ class Hand(base.Task):
         # The following also works for parameters:
         # obs['status']['parameters'] = self.parameters
         # obs['status']['time'] = np.array(physics.time())
-        
+
         #############################
         ### parameters ###
         ##################
@@ -730,7 +778,10 @@ class Hand(base.Task):
         #     obs['info']['rand']['test'] = np.array(int(self.termination), dtype=np.uint8)
         return obs
 
-    def get_reward(self, physics):
+
+
+
+    def get_reward20(self, physics):
         """Returns a reward applicable to the performed task.
         This is called from two places:
           - suite > base.py > after_step: This is to visualize rewards
@@ -772,6 +823,31 @@ class Hand(base.Task):
         #     physics._reset_next_step = True
         #     # pass
         return reward
+
+    def get_reward44(self, physics):
+        """Returns a reward applicable to the performed task."""
+        height = physics.named.data.xipos['long_cylinder', 'z']
+
+
+        # tolerance(x, bounds=(0.0, 0.0), margin=0.0, sigmoid='gaussian', value_at_margin=0.1):
+        height_object = rewards.tolerance(height, bounds=(0.25,np.inf), margin=0)
+        # height_object = (1 + height_object)/2
+
+        reward = height_object
+        
+        # Commands of the agent to the robot in the current step:      physics.control()
+
+        # TODO: With velocity-based controllers we can penalize the amount of actuation sent
+        #       to actuators. We can penalize the sum over absolute values of finger actuations.
+
+        # touch_data = np.log1p(self.named.data.sensordata[['touch_toe', 'touch_heel']])
+        # if reward < 0:
+        #     physics._reset_next_step = True
+        #     # pass
+        return reward
+    
+    def get_reward(self, physics):
+        pass
     
     def get_termination(self, physics):
         """Terminates when the we are not good."""
