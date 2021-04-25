@@ -9,10 +9,6 @@
            * OR CONDITIONALIZE USING/LOADING TEXTURES/MATERIALS ON A VARIABLE!
      -->
     
-    <!-- <visual>
-        <global offwidth="960" offheight="720"/>
-    </visual> -->
-
     <compiler angle="radian" meshdir="mesh/bb_left_hand/" texturedir="texture/"/>
     <!-- "option" tag is taken from MPL.xml hand -->
     <option timestep="0.002" iterations="50" apirate="50" solver="Newton" tolerance="1e-10" cone="elliptic" gravity="0 0 -9.81" />
@@ -28,8 +24,8 @@
         	<joint limited="true" damping="0.2" armature=".01"/>
         	<site type="ellipsoid" group="3"/> <!-- material="MatTouch" -->
             <position ctrllimited="true" kp="10"/>
-            <!-- <velocity ctrllimited="true" ctrlrange="-10 10" forcelimited="true" forcerange="-10 10" kv="100"/> -->
             <velocity ctrllimited="true" ctrlrange="-1 1" forcelimited="true" forcerange="-1 1" kv="50"/>
+            <!-- <velocity ctrllimited="true" kv="50"/> -->
 		</default>
     </default>
 
@@ -136,20 +132,32 @@
         <camera name="fixed" pos="-0.3 -.7 0.7" zaxis="0 -1 1.3" fovy="60" ipd="0.068"/>
         <!-- <camera name="fixed" pos="0 -0.7 0.7" zaxis="0 -1 1" fovy="45" ipd="0.068"/> -->
         
+
         <!-- table -->
         <!-- Initial: 1x1     with +-0.4 bases -->
         <!-- Final  : 1.4x1.4 with +-0.6 bases -->
-        <geom type="plane" pos="-0.3 0 0" size=".7 .7 .025" material="table2d"/> <!-- material= | MatWoodB | green_table -->
-        <geom contype="0" conaffinity="0" type="box" pos="-0.3 0 -0.026" size=".7 .7 .025" material="table2d" /> <!-- material="blue_color tablecube" -->
+        <geom type="plane" pos="-0.3 0 0" size=".7 .7 .025" material="table2d"/> <!-- material= table2d | MatWoodB | green_table -->
+        <geom contype="0" conaffinity="0" type="box" pos="-0.3 0 -0.026" size=".7 .7 .025" material="table2d" /> <!-- material="table2d blue_color tablecube" -->
+        <geom contype="0" conaffinity="0" type="cylinder" fromto=" .3  .6 -1.001  .3  .6 -0.001" size="0.04" material="table2d" /> <!-- table2d -->
+        <geom contype="0" conaffinity="0" type="cylinder" fromto="-.9  .6 -1.001 -.9  .6 -0.001" size="0.04" material="table2d" /> <!-- table2d -->
+        <geom contype="0" conaffinity="0" type="cylinder" fromto=" .3 -.6 -1.001  .3 -.6 -0.001" size="0.04" material="table2d" /> <!-- table2d -->
+        <geom contype="0" conaffinity="0" type="cylinder" fromto="-.9 -.6 -1.001 -.9 -.6 -0.001" size="0.04" material="table2d" /> <!-- table2d -->
+        <!-- /table -->
+
+        <!-- ground -->
+        <geom contype="0" conaffinity="0" type="plane" pos="0 0 -1" size="10 10 0.25" material="groundplane"/> <!-- material="groundplane | blue_color | groundplane" -->
+        <!-- /ground -->
+
+
+        <!-- Natural colors -->
+        <!-- <geom type="plane" pos="-0.3 0 0" size=".7 .7 .025" material="table2d"/>
+        <geom contype="0" conaffinity="0" type="box" pos="-0.3 0 -0.026" size=".7 .7 .025" material="table2d" />
 		<geom contype="0" conaffinity="0" type="cylinder" fromto=" .3  .6 -1.001  .3  .6 -0.001" size="0.04" material="table2d" />
 		<geom contype="0" conaffinity="0" type="cylinder" fromto="-.9  .6 -1.001 -.9  .6 -0.001" size="0.04" material="table2d" />
 		<geom contype="0" conaffinity="0" type="cylinder" fromto=" .3 -.6 -1.001  .3 -.6 -0.001" size="0.04" material="table2d" />
         <geom contype="0" conaffinity="0" type="cylinder" fromto="-.9 -.6 -1.001 -.9 -.6 -0.001" size="0.04" material="table2d" />
-        <!-- /table -->
-
-        <!-- ground -->
-        <geom contype="0" conaffinity="0" type="plane" pos="0 0 -1" size="10 10 0.25" material="groundplane"/> <!-- material="blue_color | groundplane" -->
-        <!-- /ground -->
+        <geom contype="0" conaffinity="0" type="plane" pos="0 0 -1" size="10 10 0.25" material="groundplane"/> -->
+        
 
 
         <!-- object -->
@@ -316,7 +324,7 @@
 	
 	
 	<equality>
-        <weld body1="mocap" body2="base_link" solref="0.001 1" solimp=".9 .9 0.01"/>
+        <weld body1="mocap" body2="base_link" solref="0.01 1" solimp=".9 .9 0.01"/>
         <!-- <weld body1="mocap" body2="base_link" solref="0.01 1" solimp=".9 .9 0.01"/> -->
         <!-- <connect body1="mocap" body2="base_link" anchor="0 0 0" solref="0.02 1" solimp="0.9 0.95 0.001" /> -->
 
@@ -359,11 +367,11 @@
     <!-- ctrlrange in velocity actuators is of dimension of velocity. -->
     <actuator>
         <position name="A_thumb_C"         class="Generic" joint="TCJ"  ctrlrange=" 0 1.05"/>
-        <velocity name="A_thumb_proximal"  class="Generic" joint="TPJ"  forcerange="-2 2" gear="-1 0 0 0 0 0"/>
-		<velocity name="A_index_proximal"  class="Generic" joint="IPJ" />
-		<velocity name="A_middle_proximal" class="Generic" joint="MPJ" />
-		<velocity name="A_ring_proximal"   class="Generic" joint="RPJ" />
-        <velocity name="A_pinky_proximal"  class="Generic" joint="PPJ" />
+        <velocity name="A_thumb_proximal"  class="Generic" joint="TPJ" forcerange="-2 2" gear="-1 0 0 0 0 0"/>
+        <velocity name="A_index_proximal"  class="Generic" joint="IPJ"/>
+        <velocity name="A_middle_proximal" class="Generic" joint="MPJ"/>
+        <velocity name="A_ring_proximal"   class="Generic" joint="RPJ"/>
+        <velocity name="A_pinky_proximal"  class="Generic" joint="PPJ"/>
 	</actuator>
 
     <!-- <actuator>
