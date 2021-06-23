@@ -1,6 +1,6 @@
 # DEXTRON: DEXTerity enviRONment
 
-DEXTRON is a stochastic environment with sparse reward function which simulates a prosthetic hand with real human transport motions. The objective of the environment is to successfully grasp the only object in the environment -- a cylinder. DEXTRON uses real data collected from 9 human subjects:
+DEXTRON (check on [arXiv](https://arxiv.org/abs/2104.12842)) is a stochastic environment with a sparse reward function which simulates a prosthetic hand with real human transport motions. The objective of the environment is to successfully grasp the only object in the environment -- a cylinder. DEXTRON uses real data collected from 9 human subjects:
 
 <p align="center">
   <img src="./doc/1_data_collection.gif" width="320">
@@ -9,6 +9,12 @@ DEXTRON is a stochastic environment with sparse reward function which simulates 
 ## Installation
 
 Install [Digideep](https://github.com/sharif1093/digideep) before usage.
+
+## Replicate RLIL with DUR=0.1
+
+```bash
+python -m digideep.main --save-modules "dextron" --params dextron.params.sac_a00 --cpanel '{"time_limit":10.0, "demo_use_ratio":0.1, "batch_size":32, "exclude_obs":["rel_obj_hand_dist", "rel_obj_hand", "distance2", "closure", "timestep"], "generator_type":"real", "number_epochs":3000, "render":false, "database_filename":"./data/session_20201011162549_sweet_cray.csv", "seed":1}' --session-path /tmp/sessions --session-name seed_1
+```
 
 ## How are environment settings sampled in DEXTRON?
 
@@ -41,14 +47,17 @@ The current best success rate on DEXTRON is 75% based on Soft Actor-Critic metho
 ## Citation
 
 ```bibtex
-@INPROCEEDINGS{dextron21,
-  title      = "End-to-end grasping policies for human-in-the-loop robots via
-                deep reinforcement learning",
-  booktitle  = "2021 {IEEE} International Conference on Robotics and
-                Automation ({ICRA})",
-  author     = "Sharif, Mohammadreza and Erdogmus, Deniz and Amato, Christopher and Padir, Taskin",
-  publisher  = "IEEE",
-  year       =  {2021},
+@INPROCEEDINGS{sharif2021dextron,
+  title         = "End-to-end grasping policies for human-in-the-loop robots via
+                   deep reinforcement learning",
+  booktitle     = "2021 {IEEE} International Conference on Robotics and
+                   Automation ({ICRA})",
+  author        = "Sharif, Mohammadreza and Erdogmus, Deniz and Amato, Christopher and Padir, Taskin",
+  publisher     = "IEEE",
+  year          =  {2021},
+  eprint        =  {2104.12842},
+  archivePrefix =  {arXiv},
+  primaryClass  =  {cs.RO}
 ```
 
 ## License
